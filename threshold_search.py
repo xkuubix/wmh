@@ -180,7 +180,7 @@ if 1:
             # net.momentum = 0.01
     net.apply(deactivate_batchnorm)
 #%%
-std = torch.load('/media/dysk_a/jr_buler/WMH/'
+std = torch.load(config['dir']['root']
                     + 'neptune_saved_models/'
                     + '13c366a6-88dc-44d5-b56a-8097cdd37b48',
                     map_location=device)

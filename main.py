@@ -17,8 +17,9 @@ from choose_NCOS import choose_NCOS
 from net_utils import train_net, test_net
 from BrainWmhDataset import BrainWmhDataset
 from torch.utils.data import random_split, DataLoader
-from captum.attr import IntegratedGradients
-from captum.attr import LayerGradCam
+# from captum.attr import IntegratedGradients
+from captum.attr import LayerGradCam, LayerAttribution
+
 
 #%%
 def get_args_parser():
@@ -170,6 +171,7 @@ net, criterion, optimizer, scheduler = choose_NCOS(
     lr=lr, wd=wd,
     scheduler=scheduler_type)
 
+# in theory batch size is 1 (in practice network sees batch size as concatenated slices)
 if 1:
     def deactivate_batchnorm(net):
         if isinstance(net, nn.BatchNorm2d):
@@ -210,7 +212,7 @@ if 1:
                                                   class_names, device)
     
     unique_filename1 = str(uuid.uuid4())
-    model_save_path = ('/media/dysk_a/jr_buler/WMH/neptune_saved_models/'
+    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
                        + unique_filename1)
 
     if run is not None:
@@ -234,7 +236,7 @@ if 1:
                                                   class_names, device)
 
     unique_filename2 = str(uuid.uuid4())
-    model_save_path = ('/media/dysk_a/jr_buler/WMH/neptune_saved_models/'
+    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
                        + unique_filename2)
 
     if run is not None:
@@ -254,15 +256,10 @@ if 1:
 
 if run is not None:
     run.stop()
-#%%
-# dać funkcję rysowania slice z patchy (dla 0 overlapa)
-
-
 # %%
-# zmieniony GAMIL - wagi A nie na outpucie
 if 0:
 
-    std = torch.load('/media/dysk_a/jr_buler/WMH/'
+    std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
                      + '13c366a6-88dc-44d5-b56a-8097cdd37b48',
                      map_location=device)
@@ -321,7 +318,6 @@ if 0:
                 # attributions, _ = ig.attribute(mil_slice, baselines=baseline, return_convergence_delta=True)
                 layer_gc = LayerGradCam(net, net.feature_extractor.layer4[-1].conv2)  # Initialize GradCAM with model and target layer 
                 # target = 
-                from captum.attr import LayerAttribution
                 attributions = layer_gc.attribute(mil_slice, target=0)  # Compute attributions for (0th) first neuron (and only is present)
                 attributions = LayerAttribution.interpolate(attributions, (33, 33))
                 attributions = attributions.squeeze().cpu() # 

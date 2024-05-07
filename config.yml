@@ -2,11 +2,12 @@ seed: 42
 device: 'cuda:1'
 
 dir:
+  root: "/media/dysk_a/jr_buler/WMH/"
   train: "/media/dysk_a/jr_buler/WMH/dataverse_files/training/"
   test: "/media/dysk_a/jr_buler/WMH/dataverse_files/test/"
 
 data_sets:
-  num_workers: 0
+  num_workers: 2
   split_fraction_train_val: 0.8  
   class_names: 'Normal_WMH'
 
