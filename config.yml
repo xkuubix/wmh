@@ -1,0 +1,40 @@
+seed: 42
+device: 'cuda:1'
+
+dir:
+  train: "/media/dysk_a/jr_buler/WMH/dataverse_files/training/"
+  test: "/media/dysk_a/jr_buler/WMH/dataverse_files/test/"
+
+data_sets:
+  num_workers: 0
+  split_fraction_train_val: 0.8  
+  class_names: 'Normal_WMH'
+
+  patch_size: 33
+  overlap_train_val: 0.75
+  overlap_test: 0.9
+
+training_plan:
+  architectures:
+    # amil, gamil, l_dsmil, nl_dsmil, gmamil, clam_sb, clam_mb
+    names: 'gamil'
+    dropout: True #p=0.25
+  parameters:
+    batch_size: 1
+    epochs: 50
+    patience: 10
+    lr: 0.001
+    wd: 0.001
+    
+    grad_accu:
+      is_on: False
+      steps: 4
+
+  criterion: 'bce'
+
+  optim_name: 'sgd'
+
+  scheduler:
+    name: 'lin'
+    step_size: 20
+    gamma: 0.9
