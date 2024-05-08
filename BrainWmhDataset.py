@@ -133,7 +133,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
 
 
         # randomize slice label by randomly zeroing image ROIs and masks
-        if self.train or True:
+        if self.train:# or True:
             for item in range(patch_labels.shape[1]):                    
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
