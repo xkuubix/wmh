@@ -178,13 +178,14 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         target = 1.0*(non_zero_count.sum(1) > 0)
 
 
-        # print(img_bag.shape) torch.Size([15, 210, 3, 32, 32])
+        # print(img_bag.shape) ~ torch.Size([15, 210, 3, 32, 32])
         img = []
         patch_idx = []
         for slice in range(img_bag.shape[0]):
             patches_to_keep = []
             # print(img_bag[slice, patch, 0, :, :].shape)
             for patch in range(img_bag.shape[1]):
+                # discard patches under certain threshold of non-zero pixels
                 if torch.count_nonzero(img_bag[slice, patch, 0, :, :], dim=(0, 1)) >= (0.9*self.patch_size**2):
                     patches_to_keep.append(patch)
             patch_idx.append(patches_to_keep)
