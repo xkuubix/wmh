@@ -5,6 +5,7 @@ import uuid
 import yaml
 import argparse
 import neptune
+from neptune.utils import stringify_unsupported
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -61,10 +62,10 @@ train_dir = config['dir']['train']
 test_dir = config['dir']['test']
 
 # training parameters
-EPOCHS = config['training_plan']['parameters']['epochs']
+EPOCHS = config['training_plan']['parameters']['epochs'][0]
 PATIENCE = config['training_plan']['parameters']['patience']
-lr = config['training_plan']['parameters']['lr']
-wd = config['training_plan']['parameters']['wd']
+lr = config['training_plan']['parameters']['lr'][0]
+wd = config['training_plan']['parameters']['wd'][0]
 grad_accu = config['training_plan']['parameters']['grad_accu']['is_on']
 grad_accu_steps = config['training_plan']['parameters']['grad_accu']['steps']
 net_ar = config['training_plan']['architectures']['names']
@@ -105,9 +106,9 @@ val_size = total_size - train_size
 brain_train, brain_val = random_split(brain_train_val,
                                       [train_size, val_size])
 
-# del zrobic
 brain_val = copy.deepcopy(brain_val)
-brain_val.dataset.train = False
+brain_val.dataset.train = True
+del brain_train_val
 
 
 brain_test = BrainWmhDataset(root_dir=test_dir,
@@ -147,17 +148,19 @@ test_loader = DataLoader(brain_test,
                          )
 
 
-data_loaders = {"test": train_loader,
+data_loaders = {"train": train_loader,
                 "val": val_loader,
-                "train": test_loader}
+                "test": test_loader,
+                }
 
 dl_sizes = [len(item) for item in [train_loader,
                                    val_loader,
                                    test_loader]]
 
-data_loaders_sizes = {"test": dl_sizes[0],
+data_loaders_sizes = {"train": dl_sizes[0],
                       "val": dl_sizes[1],
-                      "train": dl_sizes[2]}
+                      "test": dl_sizes[2],
+                      }
 
 #%%
 # select NCOS
@@ -185,7 +188,7 @@ if 1:
 # TRAIN NETWORK---------------------------------------------------------------
 if 1:
     run = neptune.init_run(project='ProjektMMG/WMH')
-    run['config'] = config
+    run['config'] = stringify_unsupported(config)
 else:
     run = None
 
