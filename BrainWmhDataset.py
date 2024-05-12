@@ -71,7 +71,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                                self.patch_size,
                                self.patch_size,
                                self.overlap)
-        brain['image'] = brain['image'].permute(2, 0, 1)
+        brain['image'] = brain['image'].permute(2, 0, 1)    # shape [slice, h, w]
         brain['mask'] = brain['mask'].permute(2, 0, 1)
         # deleting 'other patology' mask labels
         # mask_bag[mask_bag==2.0] = 0.
@@ -84,11 +84,12 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         h, w = brain['image'].shape[1], brain['image'].shape[2] 
         mask_bag, mask_coords = self.convert_img_to_bag(image=brain['mask'],
                                                         tiles=tiles)
-        img_bag, img_coords  = self.convert_img_to_bag(image=brain['image'],
-                                                       tiles=tiles)
+        # img_bag, img_coords  = self.convert_img_to_bag(image=brain['image'],
+        #                                                tiles=tiles)
+
         # ------------------- slice sampling
         patch_labels = mask_bag.sum(dim=(2, 3))
-        patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # [patch, slice]
+        patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # n_patches x n_slices
         
         
         # select only positive slices
@@ -107,8 +108,12 @@ class BrainWmhDataset(torch.utils.data.Dataset):
             brain['mask'] = brain['mask'][columns_to_keep, :, :]
             brain['brain_mask'] = brain['brain_mask'][columns_to_keep, :, :]
 
+            
+            ## patch_labels = patch_labels[:, columns_to_keep] #todo
             patch_labels = mask_bag.sum(dim=(2, 3))
             patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # [patch, slice] 
+            
+            
             # plt.imshow(patch_labels.T)
             # plt.show()
 
@@ -126,14 +131,15 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         # brain_mask = dilation.squeeze(1)
         # brain_mask = brain_mask[:, :brain['image'].shape[1], : brain['image'].shape[2]]
      
-        brain['image'] = torch.mul(brain['image'], brain['brain_mask'])
+        # brain['image'] = torch.mul(brain['image'], brain['brain_mask'])
         # -------------------
         img_bag, img_coords  = self.convert_img_to_bag(image=brain['image'],
                                                        tiles=tiles)
+        # img_bag shape: [patch, slice, h, w]
 
 
         # randomize slice label by randomly zeroing image ROIs and masks
-        if self.train:# or True:
+        if self.train:
             for item in range(patch_labels.shape[1]):                    
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
