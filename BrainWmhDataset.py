@@ -5,7 +5,10 @@ import numpy as np
 import nibabel as nib
 import torch.nn.functional
 import torchvision.transforms.functional as TF
+import logging
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 class BrainWmhDataset(torch.utils.data.Dataset):
   
@@ -91,7 +94,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         patch_labels = mask_bag.sum(dim=(2, 3))
         patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # n_patches x n_slices
         
-        
+        logger.info(f'image shape: {brain["image"].shape}')
         # select only positive slices
         if True:
             columns_to_keep = []
@@ -116,28 +119,15 @@ class BrainWmhDataset(torch.utils.data.Dataset):
             
             # plt.imshow(patch_labels.T)
             # plt.show()
-
+        logger.info(f'image shape (after): {brain["image"].shape}')
         # ------------------- BACKGROUND REMOVAL
-        # kernel_size = 32
-        # structuring_element = torch.ones(1, 1, kernel_size, kernel_size, dtype=torch.double)
-        # # Apply morphological erosion
-        # erosion = torch.nn.functional.conv2d(brain['image'].unsqueeze(0).permute(1, 0, 2, 3), structuring_element, padding=kernel_size // 2)
-
-        # # Apply morphological dilation            
-        # dilation = torch.nn.functional.conv2d(erosion, structuring_element, padding=kernel_size // 2)
-        # dilation=dilation/dilation.max()
-        # dilation[dilation<0.2*dilation.max()]=0
-        # dilation[dilation>=0.2*dilation.max()]=1
-        # brain_mask = dilation.squeeze(1)
-        # brain_mask = brain_mask[:, :brain['image'].shape[1], : brain['image'].shape[2]]
-     
         # brain['image'] = torch.mul(brain['image'], brain['brain_mask'])
         # -------------------
         img_bag, img_coords  = self.convert_img_to_bag(image=brain['image'],
                                                        tiles=tiles)
         # img_bag shape: [patch, slice, h, w]
 
-
+        logger.info(f'patch_labels shape: {patch_labels.shape}')
         # randomize slice label by randomly zeroing image ROIs and masks
         if self.train:
             for item in range(patch_labels.shape[1]):                    
@@ -197,6 +187,8 @@ class BrainWmhDataset(torch.utils.data.Dataset):
             patch_idx.append(patches_to_keep)
             img.append(img_bag[slice, patches_to_keep, :, :, :])
 
+        logger.info(f'img length: {len(img)}')
+        logger.info(f'img shape: {img[0].shape}')
         return img, {'labels': target, 'masks': mask_bag,
                      'img_coords': img_coords, 'mask_coords': mask_coords,
                      'img_size': [h, w], 'tiles': tiles, 'patch_id': patch_idx,
