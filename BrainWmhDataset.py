@@ -114,7 +114,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
             
             ## patch_labels = patch_labels[:, columns_to_keep] #todo
             patch_labels = mask_bag.sum(dim=(2, 3))
-            patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # [patch, slice] 
+            patch_labels[mask_bag.sum(dim=(2, 3))>0] = 1 # [n_patches, n_slices] 
             
             
             # plt.imshow(patch_labels.T)
@@ -130,7 +130,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         logger.info(f'patch_labels shape: {patch_labels.shape}')
         # randomize slice label by randomly zeroing image ROIs and masks
         if self.train:
-            for item in range(patch_labels.shape[1]):                    
+            for item in range(patch_labels.shape[1]): # shape[1] = n_slices            
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
                     # min_id = 0
@@ -179,7 +179,6 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         patch_idx = []
         for slice in range(img_bag.shape[0]):
             patches_to_keep = []
-            # print(img_bag[slice, patch, 0, :, :].shape)
             for patch in range(img_bag.shape[1]):
                 # discard patches under certain threshold of non-zero pixels
                 if torch.count_nonzero(img_bag[slice, patch, 0, :, :], dim=(0, 1)) >= (0.9*self.patch_size**2):
