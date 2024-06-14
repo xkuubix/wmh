@@ -1,10 +1,7 @@
 # %%
-import os
 import copy
-import uuid
 import yaml
 import argparse
-import neptune
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -14,7 +11,6 @@ from torch import nn
 from torchvision import transforms as T
 
 from choose_NCOS import choose_NCOS
-from net_utils import train_net, test_net
 from BrainWmhDataset import BrainWmhDataset
 from torch.utils.data import random_split, DataLoader
 from captum.attr import IntegratedGradients, LayerGradCam, LayerAttribution
@@ -78,8 +74,6 @@ brain_test = BrainWmhDataset(root_dir=test_dir,
                              transforms=None,
                              train=False)
 print('Test len', len(brain_test))
-
-#%%
 #%%
 # gen datsets
 transform = T.Compose([#T.RandomAffine(degrees=(0), translate=(0, 0.1)),
@@ -147,17 +141,17 @@ test_loader = DataLoader(brain_test,
                          )
 
 
-data_loaders = {"test": train_loader,
+data_loaders = {"train": train_loader,
                 "val": val_loader,
-                "train": test_loader}
+                "tes": test_loader}
 
 dl_sizes = [len(item) for item in [train_loader,
                                    val_loader,
                                    test_loader]]
 
-data_loaders_sizes = {"test": dl_sizes[0],
+data_loaders_sizes = {"train": dl_sizes[0],
                       "val": dl_sizes[1],
-                      "train": dl_sizes[2]}
+                      "test": dl_sizes[2]}
 
 #%%
 # select NCOS
@@ -182,7 +176,8 @@ if 1:
 #%%
 std = torch.load(config['dir']['root']
                     + 'neptune_saved_models/'
-                    + '13c366a6-88dc-44d5-b56a-8097cdd37b48',
+                    # + '34f54771-8112-4403-8226-0a4c3f5b4b76',
+                    + '2d111a3b-0b6a-4735-be81-6dae96b39759',
                     map_location=device)
 net.load_state_dict(std)
 with torch.no_grad():
@@ -194,7 +189,7 @@ with torch.no_grad():
                'recall': list(),
                 'f1_score': list(),
                'specificity': list()}
-    th = np.arange(1, 99, 1)
+    th = np.arange(90, 99, 1)
     for thv in th:
         for d_s in brain_train:
             # d_s[0].shape torch.Size([1, slice, patch, channel, h, w)
@@ -249,8 +244,12 @@ with torch.no_grad():
                 for iter, item in enumerate(d_s[1]['patch_id'][slice_number]):
                     h_min, w_min, dh, dw, _, _ = tiles[item] # iter lub item
 
-                    attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
-                        weights[iter].detach().cpu()
+                    if len(weights.shape) == 0:
+                        attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
+                        weights.detach().cpu().item()
+                    else:
+                        attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
+                            weights[iter].detach().cpu()
                     
                     img_from_patches[:, h_min:h_min+dh, w_min:w_min+dw] +=\
                         bags[slice_number][iter]
@@ -284,9 +283,12 @@ with torch.no_grad():
                 image[image < threshold] = 0
                 from scipy.ndimage import median_filter
                 image = median_filter(image, size=16, mode='constant', cval=0)
-
+                if score.item() < 0.5:
+                    image = torch.zeros(h, w)
+                    output = image.reshape(-1)
+                else:
+                    output = torch.from_numpy(image.reshape(-1))
                 mask = d_s[1]['full_mask'].squeeze(0)[slice_number]
-                output = torch.from_numpy(image.reshape(-1))
                 target = mask.reshape(-1).float()
 
                 tp = torch.sum(output * target)  # TP
