@@ -205,6 +205,9 @@ def train_net(net, dataloaders,
                 best_net_wts_acc = copy.deepcopy(net.state_dict())
 
         # early stopping
+        if neptune_run is not None:
+            # NEPTUNE LOGGING
+            neptune_run['patience_epochs'].log(patience - early_stopping_counter)
         if early_stopping_counter >= patience:
             print('INFO: Early stopping!')
             break
