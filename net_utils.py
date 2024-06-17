@@ -206,9 +206,10 @@ def train_net(net, dataloaders,
             # NEPTUNE LOGGING
             neptune_run['patience_epochs'].log(patience - early_stopping_counter)
         if early_stopping_counter >= patience:
-            print('INFO: Early stopping!')
+            print('INFO: Early stopping! - patience reached 0')
             break
         if accuracy_stats['train'][-1] > 0.999:
+            print('INFO: Early stopping! - train accuracy reached 1.0')
             break
 
     time_e = time.time() - since
