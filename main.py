@@ -1,5 +1,4 @@
 # %%
-import os
 import copy
 import uuid
 import yaml
@@ -8,6 +7,7 @@ import neptune
 from neptune.utils import stringify_unsupported
 import numpy as np
 import matplotlib.pyplot as plt
+import logging
 
 import torch
 import torch.cuda
@@ -21,7 +21,8 @@ from torch.utils.data import random_split, DataLoader
 # from captum.attr import IntegratedGradients
 from captum.attr import LayerGradCam, LayerAttribution
 
-
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.ERROR)
 #%%
 def get_args_parser():
     default = '/home/jr_buler/wmh/config.yml'
@@ -174,8 +175,17 @@ net, criterion, optimizer, scheduler = choose_NCOS(
     lr=lr, wd=wd,
     scheduler=scheduler_type)
 
+
+# fine tune
+if 0:
+    std = torch.load(config['dir']['root']
+                     + 'neptune_saved_models/'
+                     + '2d111a3b-0b6a-4735-be81-6dae96b39759',
+                     map_location=device)
+    net.load_state_dict(std)
+
 # in theory batch size is 1 (in practice network sees batch size as concatenated slices)
-if 1:
+if 0:
     def deactivate_batchnorm(net):
         if isinstance(net, nn.BatchNorm2d):
             net.track_running_stats = False
@@ -183,10 +193,9 @@ if 1:
             net.running_var = None
             # net.momentum = 0.01
     net.apply(deactivate_batchnorm)
-
 #%%
 # TRAIN NETWORK---------------------------------------------------------------
-if 1:
+if config['run_with_neptune']:
     run = neptune.init_run(project='ProjektMMG/WMH')
     run['config'] = stringify_unsupported(config)
 else:
@@ -264,18 +273,21 @@ if 0:
 
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
-                     + '13c366a6-88dc-44d5-b56a-8097cdd37b48',
+                    #  + '2d111a3b-0b6a-4735-be81-6dae96b39759',
+                    #  + 'debe6bb9-8f7c-4937-a05c-4c82525b5157',
+                     + 'ee71998c-e395-4c43-8754-092893ba0f58',
+                    #  + '34f54771-8112-4403-8226-0a4c3f5b4b76',
                      map_location=device)
     net.load_state_dict(std)
     with torch.no_grad():
         i = 0
         for d_s in brain_test:
             # d_s[0].shape torch.Size([1, slice, patch, channel, h, w)
-
+            d_s = brain_test[10]
             # for slice_number in range(d_s[0].shape[0]): # shape 1? dla slice-wise
             for slice_number in range(len(d_s[0])): # shape 1? dla slice-wise
-
-                slice_number = 1
+                
+                # slice_number += 30
 
                 # bags = d_s[0].squeeze(dim=0)
                 bags = d_s[0]
@@ -336,8 +348,12 @@ if 0:
                 for iter, item in enumerate(d_s[1]['patch_id'][slice_number]):
                     h_min, w_min, dh, dw, _, _ = tiles[item] # iter lub item
 
-                    attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
-                        weights[iter].detach().cpu()
+                    if len(weights.shape) == 0:
+                        attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
+                        weights.detach().cpu().item()
+                    else:
+                        attention_map[h_min:h_min+dh, w_min:w_min+dw] +=\
+                            weights[iter].detach().cpu()
                     
                     img_from_patches[:, h_min:h_min+dh, w_min:w_min+dw] +=\
                         bags[slice_number][iter]
@@ -367,11 +383,15 @@ if 0:
 
                 percentile = 98 # 95
                 image = attribution_map.clone()
+                # image = attention_map.clone()
                 threshold = np.percentile(image, percentile)
                 image[image >= threshold] = 1
                 image[image < threshold] = 0
                 from scipy.ndimage import median_filter
                 image = median_filter(image, size=16, mode='constant', cval=0)
+                if score.item() < 0.5:
+                    image = torch.zeros(h, w)
+                
                 mask = d_s[1]['full_mask'].squeeze(0)[slice_number]
 
                 # attention_map[attention_map <= 0.8] = 0.
@@ -384,7 +404,7 @@ if 0:
                     ax3.imshow(mask, cmap='gray')
                     ax4.imshow(attention_map, cmap='gray')
                     ax5.imshow(image, cmap='gray')
-                    for ax in [ax1, ax2, ax3, ax4]:
+                    for ax in [ax1, ax2, ax3, ax4, ax5]:
                         ax.axis('off')
 
                     # # _, pred = torch.max(output[0].reshape(-1, 4), 1)
@@ -394,7 +414,11 @@ if 0:
                     s_title = 'Ground truth: ' + str(int(d_s[1]['labels'][slice_number].item()))
                     s_title += '\nPred: ' + str(pred)  # gamil
                     s_title += ' ({:.2f})'.format(score)
-                    ax1.set_title(s_title, fontsize=60)
+                    if round(score.item()) == d_s[1]['labels'][slice_number]:
+                        color = 'black'
+                    else:
+                        color = 'red'
+                    ax1.set_title(s_title, fontsize=60, color=color)
                     ax2.set_title("Grad-cam", fontsize=60)
                     ax3.set_title("True mask", fontsize=60)
                     s_title = 'Attention-map'
@@ -409,7 +433,7 @@ if 0:
                     # s_title = "Predicted: " + predictions[int(pred[0])] +\
                     #     '[' + str(score[0][0].__round__(2)) + ']'
                     # # [0][0] clam ds // [0][0][0] ag
-                break
+                # break
             i += 1
             if i == 1:
                 break
