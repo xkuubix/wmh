@@ -36,10 +36,7 @@ def train_net(net, dataloaders,
     accuracy_stats = {"train": [], "val": []}
     loss_stats = {"train": [], "val": []}
 
-    i = 0
-    # accum_steps = 4
-    # grad_acc_mode = False
-
+    gradient_accumulation_steps = 0
     optimizer.zero_grad()
     for epoch in range(num_epochs):
         print(f'Epoch {epoch+1 :3}/{num_epochs}', end=' ')
@@ -137,11 +134,11 @@ def train_net(net, dataloaders,
                                 loss = loss / accum_steps
                                 loss.backward()
                                 dl = len(dataloaders[phase])
-                                if ((i + 1) % accum_steps == 0) or (i + 1 == dl):
+                                if ((gradient_accumulation_steps + 1) % accum_steps == 0) or (gradient_accumulation_steps + 1 == dl):
                                     optimizer.step()
                                     optimizer.zero_grad()
-                                    i = 0
-                                i += 1
+                                    gradient_accumulation_steps = 0
+                                gradient_accumulation_steps += 1
                             else:
                                 loss.backward()
                                 optimizer.step()
