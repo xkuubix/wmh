@@ -7,8 +7,14 @@ import torch.nn.functional
 import torchvision.transforms.functional as TF
 import logging
 
+""" Brain Extraction Tool:
+S.M. Smith. Fast robust automated brain extraction.
+Human Brain Mapping, 17(3):143-155, November 2002.
+"""
+
+
+
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 class BrainWmhDataset(torch.utils.data.Dataset):
   
@@ -27,29 +33,41 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                 if f.__contains__('pre/FLAIR.nii'):
                     self.brain['image'].append(f)
                     if make_brain_mask:
-                        brain = np.array(nib.load(f).get_fdata())
-                        brain = torch.from_numpy(brain)
-                        brain = brain.permute(2, 0, 1)
+                        input_path = f
+                        output_path = root + '/brain_mask_bet.nii.gz'
+                        frac = 0.5 # default 0.5
+                        gradient = 0 # default 0
+                        bet_cmd = f"bet '{input_path}' {output_path} -f {frac} -g {gradient} -m -n"
+                        # -f <f> fractional intensity threshold (0->1); default=0.5; smaller values give larger brain outline estimates
+                        # -g <g> vertical gradient in fractional intensity threshold (-1->1); default=0; positive values give larger brain outline at bottom, smaller at top
+                        # -m generate binary brain mask
+                        # -n don't generate the default brain image output
+                        os.system(bet_cmd)
+                        print(f'Brain mask generated: {output_path}')
+                        # brain = np.array(nib.load(f).get_fdata())
+                        # brain = torch.from_numpy(brain)
+                        # brain = brain.permute(2, 0, 1)
 
-                        kernel_size = 32
-                        structuring_element = torch.ones(1, 1, kernel_size, kernel_size, dtype=torch.double)
-                        # Apply morphological erosion
-                        erosion = torch.nn.functional.conv2d(brain.unsqueeze(0).permute(1, 0, 2, 3), structuring_element, padding=kernel_size // 2)
+                        # kernel_size = 32
+                        # structuring_element = torch.ones(1, 1, kernel_size, kernel_size, dtype=torch.double)
+                        # # Apply morphological erosion
+                        # erosion = torch.nn.functional.conv2d(brain.unsqueeze(0).permute(1, 0, 2, 3), structuring_element, padding=kernel_size // 2)
 
-                        # Apply morphological dilation            
-                        dilation = torch.nn.functional.conv2d(erosion, structuring_element, padding=kernel_size // 2)
-                        dilation=dilation/dilation.max()
-                        dilation[dilation<0.2*dilation.max()]=0
-                        dilation[dilation>=0.2*dilation.max()]=1
-                        brain_mask = dilation.squeeze(1)
-                        brain_mask = brain_mask[:, :brain.shape[1], : brain.shape[2]]
-                        nifti_file = nib.Nifti1Image(brain_mask.numpy(), np.eye(4))
-                        # path_to_save = root + '/brain_mask.nii'
-                        pth = os.path.join(root, 'brain_mask.nii')
-                        nib.save(nifti_file, pth) 
-                        self.brain['brain_mask'].append(pth)
+                        # # Apply morphological dilation            
+                        # dilation = torch.nn.functional.conv2d(erosion, structuring_element, padding=kernel_size // 2)
+                        # dilation=dilation/dilation.max()
+                        # dilation[dilation<0.2*dilation.max()]=0
+                        # dilation[dilation>=0.2*dilation.max()]=1
+                        # brain_mask = dilation.squeeze(1)
+                        # brain_mask = brain_mask[:, :brain.shape[1], : brain.shape[2]]
+                        # nifti_file = nib.Nifti1Image(brain_mask.numpy(), np.eye(4))
+                        # # path_to_save = root + '/brain_mask.nii'
+                        # pth = os.path.join(root, 'brain_mask.nii')
+                        # nib.save(nifti_file, pth) 
+                        # self.brain['brain_mask'].append(pth)
                     else:
-                        pth = os.path.join(root, 'brain_mask.nii')
+                        # pth = os.path.join(root, 'brain_mask.nii')
+                        pth = os.path.join(root, 'brain_mask_bet_mask.nii.gz')
                         self.brain['brain_mask'].append(pth)
 
                 if f.__contains__('wmh.nii'):
@@ -66,8 +84,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                  }
         brain['image'] = torch.from_numpy(brain['image'])
         brain['mask'] = torch.from_numpy(brain['mask'])
-        brain['brain_mask'] = torch.from_numpy(brain['brain_mask'])
-
+        brain['brain_mask'] = torch.from_numpy(brain['brain_mask']).permute(2, 0, 1)
         # Generate data required to sample patches from the image
         tiles = self.get_tiles(brain['image'].shape[0],
                                brain['image'].shape[1],
@@ -120,16 +137,18 @@ class BrainWmhDataset(torch.utils.data.Dataset):
             # plt.imshow(patch_labels.T)
             # plt.show()
         logger.info(f'image shape (after): {brain["image"].shape}')
+
         # ------------------- BACKGROUND REMOVAL
-        # brain['image'] = torch.mul(brain['image'], brain['brain_mask'])
+        brain['image'] = torch.mul(brain['image'], brain['brain_mask'])
         # -------------------
+
         img_bag, img_coords  = self.convert_img_to_bag(image=brain['image'],
                                                        tiles=tiles)
         # img_bag shape: [patch, slice, h, w]
 
         logger.info(f'patch_labels shape: {patch_labels.shape}')
         # randomize slice label by randomly zeroing image ROIs and masks
-        if self.train:
+        if 1:#self.train:
             for item in range(patch_labels.shape[1]): # shape[1] = n_slices            
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
@@ -174,25 +193,35 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         target = 1.0*(non_zero_count.sum(1) > 0)
 
 
-        # print(img_bag.shape) ~ torch.Size([15, 210, 3, 32, 32])
+        # img_bag.shape ~ torch.Size([15, 210, 3, 33, 33])
+        # select patches with non-zero pixels (threshold 0.9)
         img = []
+        label = []
         patch_idx = []
+        masks_to_keep = []
+        '''
+            TO DO: FIX CRITICAL ERROR IN PATCH SELECTION (TARGETS)
+        '''
         for slice in range(img_bag.shape[0]):
             patches_to_keep = []
             for patch in range(img_bag.shape[1]):
                 # discard patches under certain threshold of non-zero pixels
-                if torch.count_nonzero(img_bag[slice, patch, 0, :, :], dim=(0, 1)) >= (0.9*self.patch_size**2):
+                if torch.count_nonzero(img_bag[slice, patch, 0, :, :], dim=(0, 1)) >= (0.99999*self.patch_size**2):
                     patches_to_keep.append(patch)
-            patch_idx.append(patches_to_keep)
-            img.append(img_bag[slice, patches_to_keep, :, :, :])
+            if len(patches_to_keep) != 0:
+                patch_idx.append(patches_to_keep)
+                img.append(img_bag[slice, patches_to_keep, :, :, :])
+                label.append(target[slice])
+                masks_to_keep.append(slice)
 
         logger.info(f'img length: {len(img)}')
         logger.info(f'img shape: {img[0].shape}')
-        return img, {'labels': target, 'masks': mask_bag,
+        label = torch.stack(label)
+        return img, {'labels': label, 'masks': mask_bag,
                      'img_coords': img_coords, 'mask_coords': mask_coords,
                      'img_size': [h, w], 'tiles': tiles, 'patch_id': patch_idx,
                      'full_image': brain['image'],
-                     'full_mask': brain['mask']}
+                     'full_mask': brain['mask'][masks_to_keep, :, :]}
 
     def __len__(self):
         return len(self.brain['image'])
