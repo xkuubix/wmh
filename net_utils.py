@@ -208,9 +208,10 @@ def train_net(net, dataloaders,
         if early_stopping_counter >= patience:
             print('INFO: Early stopping! - patience reached 0')
             break
-        if accuracy_stats['train'][-1] > 0.999:
-            print('INFO: Early stopping! - train accuracy reached 1.0')
-            break
+        # # allow for delayed generalization (weight decay regularization)
+        # if accuracy_stats['train'][-1] > 0.999:
+        #     print('INFO: Early stopping! - train accuracy reached 1.0')
+        #     break
 
     time_e = time.time() - since
     print(f'Training completed in {time_e // 60:.0f}m {time_e % 60:.0f}s')
