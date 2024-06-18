@@ -237,17 +237,33 @@ for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
 
 # %% Create a list to store the bags
 bags = []
+num_patches_percentage = []
+num_patches = 100
+min_percentage = 1
+max_percentage = 15
 
-percentages = [0, 0, 0, 0, 0, 10, 20, 30, 40, 50]
-num_patches = 20
+non_zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) > 0]
+zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) == 0]
 
-for percentage in percentages:
-    num_non_zero_patches = int(percentage/100 * num_patches)
-    num_zero_patches = num_patches - num_non_zero_patches
+while sum(num_patches_percentage) < len(non_zero_indices):
+    if np.random.rand() < 0.5:
+        num_patches_percentage.append(np.random.randint(min_percentage, max_percentage))
+    else:
+        num_patches_percentage.append(0)
+
+if sum(num_patches_percentage) > len(non_zero_indices):
+    num_patches_percentage[-1] -= sum(num_patches_percentage) - len(non_zero_indices)
+print(len(num_patches_percentage))
+print(sum(num_patches_percentage))
+
+
+for percentage in num_patches_percentage:
     
-    non_zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) > 0]
-    non_zero_patches = np.random.choice(non_zero_indices, size=num_non_zero_patches, replace=False)
     bag = {"image": [], "mask": [], "label": []}
+    non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
+
+    if percentage != 0:
+        non_zero_indices = list(set(non_zero_indices) - set(non_zero_patches))
     
     for i in non_zero_patches:
         img_path = os.path.join("non_zero_masks", f"img_{i}.nii")
@@ -257,8 +273,9 @@ for percentage in percentages:
         bag["mask"].append(mask_path)
         bag["label"].append(label)
     
-    zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) == 0]
+    num_zero_patches = num_patches - percentage
     zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=False)
+    # zero_indices = list(set(zero_indices) - set(zero_patches))
     for i in zero_patches:
         img_path = os.path.join("zero_masks", f"img_{i}.nii")
         mask_path = os.path.join("zero_masks", f"mask_{i}.nii")
@@ -294,4 +311,17 @@ for i, bag in enumerate(bags):
 plt.subplots_adjust(wspace=0.1, hspace=0.1)
 plt.show()
 
+# %%
+root = '/home/r_buler/coding/wmh/wmh/non_zero_masks/'
+brain = {"image": [], "mask": []}
+
+for root, dirs, files in os.walk(root, topdown=False):
+    for name in files:
+        f = os.path.join(root, name)
+        print(f)
+        if f.__contains__('img_'):
+            brain['image'].append(f)
+
+        if f.__contains__('mask_'):
+            brain['mask'].append(f)
 # %%
