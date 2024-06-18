@@ -185,7 +185,7 @@ if 0:
     net.load_state_dict(std)
 
 # in theory batch size is 1 (in practice network sees batch size as concatenated slices)
-if 0:
+if 1:
     def deactivate_batchnorm(net):
         if isinstance(net, nn.BatchNorm2d):
             net.track_running_stats = False
@@ -201,7 +201,7 @@ if config['run_with_neptune']:
 else:
     run = None
 
-if 1:
+if 0:
     state_dict_BL, state_dict_BACC, loss_stats, accuracy_stats = train_net(
         net, data_loaders,
         data_loaders_sizes,
@@ -216,7 +216,7 @@ if 1:
 
 #%%
 # TEST NETWORK----------------------------------------------------------------
-if 1:
+if 0:
     # test best val accuracy model
     net_BACC = net
     net_BACC.load_state_dict(state_dict_BACC)
@@ -269,13 +269,14 @@ if 1:
 if run is not None:
     run.stop()
 # %%
-if 0:
+if 1:
 
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
                     #  + '2d111a3b-0b6a-4735-be81-6dae96b39759',
                     #  + 'debe6bb9-8f7c-4937-a05c-4c82525b5157',
-                     + 'ee71998c-e395-4c43-8754-092893ba0f58',
+                    #  + 'ee71998c-e395-4c43-8754-092893ba0f58',
+                     + '54861e2e-e6a0-4c89-a3b1-1bf293f0bb47',
                     #  + '34f54771-8112-4403-8226-0a4c3f5b4b76',
                      map_location=device)
     net.load_state_dict(std)
@@ -406,6 +407,11 @@ if 0:
                     ax5.imshow(image, cmap='gray')
                     for ax in [ax1, ax2, ax3, ax4, ax5]:
                         ax.axis('off')
+
+                    title = 'Case: '
+                    title += d_s[1]['mri_file_path'].split('/dataverse_files')[-1].split('/pre')[0]
+                    title += '   Slice number: ' + str(d_s[1]['slices_taken'][slice_number])
+                    fig.suptitle(title, fontsize=30)
 
                     # # _, pred = torch.max(output[0].reshape(-1, 4), 1)
                     # # if pred != d_s[1]['labels'] or d_s[1]['labels'] == 0:
