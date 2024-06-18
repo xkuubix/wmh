@@ -113,7 +113,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         
         logger.info(f'image shape: {brain["image"].shape}')
         # select only positive slices
-        if True:
+        if False:
             columns_to_keep = []
             # import matplotlib.pyplot as plt
             # plt.imshow(patch_labels.T)
@@ -148,7 +148,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
 
         logger.info(f'patch_labels shape: {patch_labels.shape}')
         # randomize slice label by randomly zeroing image ROIs and masks
-        if 1:#self.train:
+        if False:#self.train:
             for item in range(patch_labels.shape[1]): # shape[1] = n_slices            
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
@@ -199,9 +199,6 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         label = []
         patch_idx = []
         masks_to_keep = []
-        '''
-            TO DO: FIX CRITICAL ERROR IN PATCH SELECTION (TARGETS)
-        '''
         for slice in range(img_bag.shape[0]):
             patches_to_keep = []
             for patch in range(img_bag.shape[1]):
@@ -219,9 +216,10 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         label = torch.stack(label)
         return img, {'labels': label, 'masks': mask_bag,
                      'img_coords': img_coords, 'mask_coords': mask_coords,
-                     'img_size': [h, w], 'tiles': tiles, 'patch_id': patch_idx,
+                     'img_size': (h, w), 'tiles': tiles, 'patch_id': patch_idx,
                      'full_image': brain['image'],
-                     'full_mask': brain['mask'][masks_to_keep, :, :]}
+                     'full_mask': brain['mask'][masks_to_keep, :, :],
+                     'slices_taken': masks_to_keep}
 
     def __len__(self):
         return len(self.brain['image'])
