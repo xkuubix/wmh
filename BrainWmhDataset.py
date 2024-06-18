@@ -219,7 +219,9 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                      'img_size': (h, w), 'tiles': tiles, 'patch_id': patch_idx,
                      'full_image': brain['image'],
                      'full_mask': brain['mask'][masks_to_keep, :, :],
-                     'slices_taken': masks_to_keep}
+                     'slices_taken': masks_to_keep,
+                     'mri_file_path': mri_file_path,
+                     'mask_file_path': mask_file_path}
 
     def __len__(self):
         return len(self.brain['image'])
