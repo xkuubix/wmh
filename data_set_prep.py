@@ -149,6 +149,10 @@ for root, dirs, files in os.walk(root, topdown=False):
             brain['mask'].append(f)
 
 # %% Load images and masks, create patches and save them to the folder
+non_zero_indices = []
+zero_indices = []
+ii = 0
+
 for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
     img = np.asarray(nib.load(img_path).dataobj)
     mask = np.asarray(nib.load(mask_path).dataobj)
@@ -204,29 +208,30 @@ for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
     whole_mask_bag = whole_mask_bag[patches_to_keep, :, :]
     ### Less memory required for data storage
 
-    ii = 0
     for img, mask in zip(whole_img_bag, whole_mask_bag):
         if torch.sum(mask) > 0:
+            non_zero_indices.append(ii)
             # Save img patch to folder for non-zero masks
             folder_path = os.path.join(os.getcwd(), "non_zero_masks")
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
-            img_path = os.path.join(folder_path, f"img_{ii}.nii")
-            mask_path = os.path.join(folder_path, f"mask_{ii}.nii")
+            img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
+            mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
             nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
             nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
         else:
+            zero_indices.append(ii)
             # Save img patch to folder for zero masks
             folder_path = os.path.join(os.getcwd(), "zero_masks")
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
-            img_path = os.path.join(folder_path, f"img_{ii}.nii")
-            mask_path = os.path.join(folder_path, f"mask_{ii}.nii")
+            img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
+            mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
             nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
             nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
         ii += 1
    
-    if i == 0:
+    if i == 1:
         
         '''
             TODO:
@@ -241,9 +246,6 @@ num_patches_percentage = []
 num_patches = 100
 min_percentage = 1
 max_percentage = 15
-
-non_zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) > 0]
-zero_indices = [i for i, mask in enumerate(whole_mask_bag) if torch.sum(mask) == 0]
 
 while sum(num_patches_percentage) < len(non_zero_indices):
     if np.random.rand() < 0.5:
@@ -260,8 +262,8 @@ print(sum(num_patches_percentage))
 for percentage in num_patches_percentage:
     
     bag = {"image": [], "mask": [], "label": []}
-    non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
 
+    non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
     if percentage != 0:
         non_zero_indices = list(set(non_zero_indices) - set(non_zero_patches))
     
@@ -285,6 +287,9 @@ for percentage in num_patches_percentage:
         bag["label"].append(label)
     
     bags.append(bag)
+
+from test_data_set_prep import test_non_zero_img_unique
+test_non_zero_img_unique(bags)
 
 # %% Plot the patches in the bags 
 import matplotlib.pyplot as plt
@@ -318,7 +323,6 @@ brain = {"image": [], "mask": []}
 for root, dirs, files in os.walk(root, topdown=False):
     for name in files:
         f = os.path.join(root, name)
-        print(f)
         if f.__contains__('img_'):
             brain['image'].append(f)
 
