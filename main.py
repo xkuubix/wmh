@@ -196,10 +196,10 @@ if 1:
 #%%
 # TRAIN NETWORK---------------------------------------------------------------
 if config['run_with_neptune']:
-    run = neptune.init_run(project='ProjektMMG/WMH')
-    run['config'] = stringify_unsupported(config)
+    neptune_run = neptune.init_run(project='ProjektMMG/WMH')
+    neptune_run['config'] = stringify_unsupported(config)
 else:
-    run = None
+    neptune_run = None
 
 if 1:
     state_dict_BL, state_dict_BACC, loss_stats, accuracy_stats = train_net(
@@ -209,7 +209,7 @@ if 1:
         optimizer, scheduler,
         num_epochs=EPOCHS,
         patience=PATIENCE,
-        neptune_run=run,
+        neptune_run=neptune_run,
         grad_acc_mode=grad_accu,
         accum_steps=grad_accu_steps
         )
@@ -226,23 +226,22 @@ torch.save(state_dict_BL, model_save_path)
 #%%
 # TEST NETWORK----------------------------------------------------------------
 if 1:
-
     # test best val accuracy model
     net_BACC = net
     net_BACC.load_state_dict(state_dict_BACC)
     metrics, figures, best_th, roc_auc = test_net(net_BACC, data_loaders,
                                                   class_names, device)
 
-    if run is not None:
-        run['test/BACC/metrics'].log(metrics['th_05'])
-        run['test/BACC/conf_mx'].upload(figures['cm_th_05'])
-        run['test/BACC/auc_roc'] = roc_auc
+    if neptune_run:
+        neptune_run['test/BACC/metrics'].log(metrics['th_05'])
+        neptune_run['test/BACC/conf_mx'].upload(figures['cm_th_05'])
+        neptune_run['test/BACC/auc_roc'] = roc_auc
         if criterion_type == 'bce':
-            run['test/BACC/th_best'] = best_th
-            run['test/BACC/metrics_th_best'].log(metrics['th_best'])
-            run['test/BACC/conf_mx_th_best'].upload(figures['cm_th_best'])
-            run['test/BACC/roc'].upload(figures['roc'])
-        run['test/BACC/file_name'] = unique_filename1
+            neptune_run['test/BACC/th_best'] = best_th
+            neptune_run['test/BACC/metrics_th_best'].log(metrics['th_best'])
+            neptune_run['test/BACC/conf_mx_th_best'].upload(figures['cm_th_best'])
+            neptune_run['test/BACC/roc'].upload(figures['roc'])
+        neptune_run['test/BACC/file_name'] = unique_filename1
 
     del net_BACC
 
@@ -252,22 +251,21 @@ if 1:
     metrics, figures, best_th, roc_auc = test_net(net_BL, data_loaders,
                                                   class_names, device)
 
-    if run is not None:
-        run['test/BL/metrics'].log(metrics['th_05'])
-        run['test/BL/conf_mx'].upload(figures['cm_th_05'])
-        run['test/BL/auc_roc'] = roc_auc
+    if neptune_run:
+        neptune_run['test/BL/metrics'].log(metrics['th_05'])
+        neptune_run['test/BL/conf_mx'].upload(figures['cm_th_05'])
+        neptune_run['test/BL/auc_roc'] = roc_auc
         if criterion_type == 'bce':
-            run['test/BL/th_best'] = best_th
-            run['test/BL/metrics_th_best'].log(metrics['th_best'])
-            run['test/BL/conf_mx_th_best'].upload(figures['cm_th_best'])
-            run['test/BL/roc'].upload(figures['roc'])
-        run['test/BL/file_name'] = unique_filename2
+            neptune_run['test/BL/th_best'] = best_th
+            neptune_run['test/BL/metrics_th_best'].log(metrics['th_best'])
+            neptune_run['test/BL/conf_mx_th_best'].upload(figures['cm_th_best'])
+            neptune_run['test/BL/roc'].upload(figures['roc'])
+        neptune_run['test/BL/file_name'] = unique_filename2
 
     del net_BL
 
-
-if run is not None:
-    run.stop()
+if neptune_run:
+    neptune_run.stop()
 # %%
 if 0:
 
