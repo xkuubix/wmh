@@ -201,7 +201,7 @@ if config['run_with_neptune']:
 else:
     run = None
 
-if 0:
+if 1:
     state_dict_BL, state_dict_BACC, loss_stats, accuracy_stats = train_net(
         net, data_loaders,
         data_loaders_sizes,
@@ -214,18 +214,24 @@ if 0:
         accum_steps=grad_accu_steps
         )
 
+unique_filename1 = str(uuid.uuid4())
+model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
+                    + unique_filename1)
+torch.save(state_dict_BACC, model_save_path)
+
+unique_filename2 = str(uuid.uuid4())
+model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
+                    + unique_filename2)
+torch.save(state_dict_BL, model_save_path)
 #%%
 # TEST NETWORK----------------------------------------------------------------
-if 0:
+if 1:
+
     # test best val accuracy model
     net_BACC = net
     net_BACC.load_state_dict(state_dict_BACC)
     metrics, figures, best_th, roc_auc = test_net(net_BACC, data_loaders,
                                                   class_names, device)
-    
-    unique_filename1 = str(uuid.uuid4())
-    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
-                       + unique_filename1)
 
     if run is not None:
         run['test/BACC/metrics'].log(metrics['th_05'])
@@ -238,7 +244,6 @@ if 0:
             run['test/BACC/roc'].upload(figures['roc'])
         run['test/BACC/file_name'] = unique_filename1
 
-    torch.save(net_BACC.state_dict(), model_save_path)
     del net_BACC
 
     # test best val loss model
@@ -246,10 +251,6 @@ if 0:
     net_BL.load_state_dict(state_dict_BL)
     metrics, figures, best_th, roc_auc = test_net(net_BL, data_loaders,
                                                   class_names, device)
-
-    unique_filename2 = str(uuid.uuid4())
-    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
-                       + unique_filename2)
 
     if run is not None:
         run['test/BL/metrics'].log(metrics['th_05'])
@@ -262,14 +263,13 @@ if 0:
             run['test/BL/roc'].upload(figures['roc'])
         run['test/BL/file_name'] = unique_filename2
 
-    torch.save(net_BL.state_dict(), model_save_path)
     del net_BL
 
 
 if run is not None:
     run.stop()
 # %%
-if 1:
+if 0:
 
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
