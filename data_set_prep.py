@@ -1,6 +1,8 @@
 # %%
 import os
 import yaml
+import json
+import math
 import argparse
 import numpy as np
 import nibabel as nib
@@ -142,7 +144,7 @@ for root, dirs, files in os.walk(root, topdown=False):
 
         if f.__contains__('pre/FLAIR.nii'):
             brain['image'].append(f)
-            pth = os.path.join(root, 'brain_mask.nii')
+            pth = os.path.join(root, 'brain_mask_bet_mask.nii.gz')
             brain['brain_mask'].append(pth)
 
         if f.__contains__('wmh.nii'):
@@ -152,30 +154,29 @@ for root, dirs, files in os.walk(root, topdown=False):
 non_zero_indices = []
 zero_indices = []
 ii = 0
+save_path = '/media/dysk_a/jr_buler/WMH/patches'
 
-for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
+for i, (img_path, brain_path, mask_path) in enumerate(zip(brain['image'], brain['brain_mask'], brain['mask'])):
     img = np.asarray(nib.load(img_path).dataobj)
     mask = np.asarray(nib.load(mask_path).dataobj)
-
-
-    '''
-        TODO: brain mask
-        ...
-    '''
+    brain = np.asarray(nib.load(brain_path).dataobj)
 
     tiles = get_tiles(img.shape[0],
                       img.shape[1],
                       patch_size,
                       patch_size,
-                      overlap=0.0)
-    """
-        TODO:
-        change overlap to var
-    """
+                      overlap=overlap_train_val)
+
     img = torch.from_numpy(img)
     mask = torch.from_numpy(mask)
+    brain = torch.from_numpy(brain)
+
     img = img.permute(2, 0, 1)    # shape [slice, h, w]
     mask = mask.permute(2, 0, 1)
+    brain = brain.permute(2, 0, 1)
+
+    img = torch.mul(img, brain, )
+    
     # deleting 'other patology' mask labels
     # mask_bag[mask_bag==2.0] = 0.
     mask[mask==2.0] = 0.
@@ -196,13 +197,8 @@ for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
     patches_to_keep = []
     for patch in range(whole_img_bag.shape[0]):
         if torch.count_nonzero(whole_img_bag[patch, :, :]) >= (0.9*patch_size**2):
-  
-            '''
-                TODO: adjust the threshold
-                ??% of the patch should be non-zero
-            '''
-
             patches_to_keep.append(patch)
+   
     patch_idx.append(patches_to_keep)
     whole_img_bag = whole_img_bag[patches_to_keep, :, :]
     whole_mask_bag = whole_mask_bag[patches_to_keep, :, :]
@@ -212,52 +208,58 @@ for i, (img_path, mask_path) in enumerate(zip(brain['image'], brain['mask'])):
         if torch.sum(mask) > 0:
             non_zero_indices.append(ii)
             # Save img patch to folder for non-zero masks
-            folder_path = os.path.join(os.getcwd(), "non_zero_masks")
+            folder_path = os.path.join(save_path, "non_zero_masks")
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
             img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
             mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
             nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
-            nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
+            # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
         else:
             zero_indices.append(ii)
             # Save img patch to folder for zero masks
-            folder_path = os.path.join(os.getcwd(), "zero_masks")
+            folder_path = os.path.join(save_path, "zero_masks")
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
             img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
             mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
             nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
-            nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
+            # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
         ii += 1
    
-    if i == 1:
-        
-        '''
-            TODO:
-            break delete
-        '''
-        
-        break
+# Save non_zero_indices and zero_indices to JSON file
+indices = {
+    "non_zero_indices": non_zero_indices,
+    "zero_indices": zero_indices
+}
+
+json_path = os.path.join(save_path, "bag_info.json")
+with open(json_path, "w") as json_file:
+    json.dump(indices, json_file)
 
 # %% Create a list to store the bags
+save_path = '/media/dysk_a/jr_buler/WMH/patches'
 bags = []
 num_patches_percentage = []
 num_patches = 100
-min_percentage = 1
-max_percentage = 15
+min_percentage = 1  # (1, 100)
+max_percentage = 15 # (1, 100)
+
+json_path = os.path.join(save_path, "bag_info.json")
+with open(json_path, "r") as json_file:
+    indices = json.load(json_file)
+
+non_zero_indices = indices["non_zero_indices"]
+zero_indices = indices["zero_indices"]
 
 while sum(num_patches_percentage) < len(non_zero_indices):
     if np.random.rand() < 0.5:
-        num_patches_percentage.append(np.random.randint(min_percentage, max_percentage))
+        num_patches_percentage.append(math.ceil(np.random.randint(min_percentage, max_percentage) * num_patches / 100))
     else:
         num_patches_percentage.append(0)
 
 if sum(num_patches_percentage) > len(non_zero_indices):
     num_patches_percentage[-1] -= sum(num_patches_percentage) - len(non_zero_indices)
-print(len(num_patches_percentage))
-print(sum(num_patches_percentage))
-
 
 for percentage in num_patches_percentage:
     
@@ -266,21 +268,20 @@ for percentage in num_patches_percentage:
     non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
     if percentage != 0:
         non_zero_indices = list(set(non_zero_indices) - set(non_zero_patches))
-    
     for i in non_zero_patches:
-        img_path = os.path.join("non_zero_masks", f"img_{i}.nii")
-        mask_path = os.path.join("non_zero_masks", f"mask_{i}.nii")
+        img_path = os.path.join(save_path, "non_zero_masks", f"img_{i}.nii.gz")
+        mask_path = os.path.join(save_path, "non_zero_masks", f"mask_{i}.nii.gz")
         label = 1
         bag["image"].append(img_path)
         bag["mask"].append(mask_path)
         bag["label"].append(label)
     
-    num_zero_patches = num_patches - percentage
-    zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=False)
+    num_zero_patches = math.floor((num_patches * (100 - percentage)) / 100)  # percentage 0-100 
+    zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=True)
     # zero_indices = list(set(zero_indices) - set(zero_patches))
     for i in zero_patches:
-        img_path = os.path.join("zero_masks", f"img_{i}.nii")
-        mask_path = os.path.join("zero_masks", f"mask_{i}.nii")
+        img_path = os.path.join(save_path, "zero_masks", f"img_{i}.nii.gz")
+        mask_path = os.path.join(save_path, "zero_masks", f"mask_{i}.nii.gz")
         label = 0
         bag["image"].append(img_path)
         bag["mask"].append(mask_path)
@@ -292,40 +293,27 @@ from test_data_set_prep import test_non_zero_img_unique
 test_non_zero_img_unique(bags)
 
 # %% Plot the patches in the bags 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+# bags = bags[:10]
+# fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
+# for i, bag in enumerate(bags):
+#     for j, img_path in enumerate(bag["image"]):
+#         img = nib.load(img_path).get_fdata()
+#         ax = axes[i, j]
+#         ax.imshow(img, cmap='gray')
+#         ax.axis('off')
 
-fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
-for i, bag in enumerate(bags):
-    for j, img_path in enumerate(bag["image"]):
-        img = nib.load(img_path).get_fdata()
-        ax = axes[i, j]
-        ax.imshow(img, cmap='gray')
-        ax.axis('off')
+# plt.subplots_adjust(wspace=0.1, hspace=0.1)
+# plt.show()
 
-plt.subplots_adjust(wspace=0.1, hspace=0.1)
-plt.show()
+# fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
+# for i, bag in enumerate(bags):
+#     for j, img_path in enumerate(bag["mask"]):
+#         img = nib.load(img_path).get_fdata()
+#         ax = axes[i, j]
+#         ax.imshow(img, cmap='gray')
+#         ax.axis('off')
 
-fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
-for i, bag in enumerate(bags):
-    for j, img_path in enumerate(bag["mask"]):
-        img = nib.load(img_path).get_fdata()
-        ax = axes[i, j]
-        ax.imshow(img, cmap='gray')
-        ax.axis('off')
-
-plt.subplots_adjust(wspace=0.1, hspace=0.1)
-plt.show()
-
-# %%
-root = '/home/r_buler/coding/wmh/wmh/non_zero_masks/'
-brain = {"image": [], "mask": []}
-
-for root, dirs, files in os.walk(root, topdown=False):
-    for name in files:
-        f = os.path.join(root, name)
-        if f.__contains__('img_'):
-            brain['image'].append(f)
-
-        if f.__contains__('mask_'):
-            brain['mask'].append(f)
+# plt.subplots_adjust(wspace=0.1, hspace=0.1)
+# plt.show()
 # %%
