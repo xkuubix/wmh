@@ -292,6 +292,49 @@ for percentage in num_patches_percentage:
 from test_data_set_prep import test_non_zero_img_unique
 test_non_zero_img_unique(bags)
 
+# %% 
+# create dataset and dataloader form the bags
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms as T
+# from test_data_set_prep import WMHDataset
+
+class WMHDataset(Dataset):
+    def __init__(self, bags, transform=None):
+        self.bags = bags
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.bags)
+
+    def __getitem__(self, idx):
+        bag = self.bags[idx]
+        img_paths = bag["image"]
+        mask_paths = bag["mask"]
+        label = int(sum(bag["label"]) > 0)
+        images = []
+        # masks = []
+        for img_path, mask_path in zip(img_paths, mask_paths):
+            img = nib.load(img_path).get_fdata()
+            # mask = nib.load(mask_path).get_fdata()
+            images.append(img)
+            # masks.append(mask)
+        if self.transform:
+            images = self.transform(images)
+            # masks = self.transform(masks)
+        return images, label
+
+transform = T.Compose([
+    T.ToTensor()
+])
+
+train_dataset = WMHDataset(bags, transform=transform)
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
+
+for images, labels in train_loader:
+    print(images.shape)
+    print(labels)
+    break
+
 # %% Plot the patches in the bags 
 # import matplotlib.pyplot as plt
 # bags = bags[:10]
