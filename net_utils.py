@@ -147,9 +147,9 @@ def train_net(net, dataloaders,
 
                     # statistics
                     if grad_acc_mode is True and phase == 'train':
-                        phase_loss += loss.item() * images.size(0) * accum_steps
+                        phase_loss += loss.detach().item() * images.size(0) * accum_steps
                     else:
-                        phase_loss += loss.item() * images.size(0)
+                        phase_loss += loss.detach().item() * images.size(0)
                     if str(criterion) == 'BCELoss()':
                         # print(preds, labels)
                         phase_corrects += torch.sum(torch.tensor(preds)
@@ -216,7 +216,8 @@ def train_net(net, dataloaders,
     time_e = time.time() - since
     print(f'Training completed in {time_e // 60:.0f}m {time_e % 60:.0f}s')
     print(f'Best val Loss: {best_loss:4f}')
-
+    # clear memory usage that may stay after training
+    torch.cuda.empty_cache()
     # load best net weights
     # net.load_state_dict(best_net_wts)
 
