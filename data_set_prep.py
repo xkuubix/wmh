@@ -2,13 +2,11 @@
 import os
 import yaml
 import json
-import math
 import argparse
 import numpy as np
 import nibabel as nib
 import torch
 import torch.cuda
-from torchvision import transforms as T
 
 #%%
 def start_points(size, split_size, overlap=0):
@@ -236,127 +234,4 @@ indices = {
 json_path = os.path.join(save_path, "bag_info.json")
 with open(json_path, "w") as json_file:
     json.dump(indices, json_file)
-
-# %% Create a list to store the bags
-save_path = '/media/dysk_a/jr_buler/WMH/patches'
-bags = []
-num_patches_percentage = []
-num_patches = 100
-min_percentage = 1  # (1, 100)
-max_percentage = 15 # (1, 100)
-
-json_path = os.path.join(save_path, "bag_info.json")
-with open(json_path, "r") as json_file:
-    indices = json.load(json_file)
-
-non_zero_indices = indices["non_zero_indices"]
-zero_indices = indices["zero_indices"]
-
-while sum(num_patches_percentage) < len(non_zero_indices):
-    if np.random.rand() < 0.5:
-        num_patches_percentage.append(math.ceil(np.random.randint(min_percentage, max_percentage) * num_patches / 100))
-    else:
-        num_patches_percentage.append(0)
-
-if sum(num_patches_percentage) > len(non_zero_indices):
-    num_patches_percentage[-1] -= sum(num_patches_percentage) - len(non_zero_indices)
-
-for percentage in num_patches_percentage:
-    
-    bag = {"image": [], "mask": [], "label": []}
-
-    non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
-    if percentage != 0:
-        non_zero_indices = list(set(non_zero_indices) - set(non_zero_patches))
-    for i in non_zero_patches:
-        img_path = os.path.join(save_path, "non_zero_masks", f"img_{i}.nii.gz")
-        mask_path = os.path.join(save_path, "non_zero_masks", f"mask_{i}.nii.gz")
-        label = 1
-        bag["image"].append(img_path)
-        bag["mask"].append(mask_path)
-        bag["label"].append(label)
-    
-    num_zero_patches = math.floor((num_patches * (100 - percentage)) / 100)  # percentage 0-100 
-    zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=True)
-    # zero_indices = list(set(zero_indices) - set(zero_patches))
-    for i in zero_patches:
-        img_path = os.path.join(save_path, "zero_masks", f"img_{i}.nii.gz")
-        mask_path = os.path.join(save_path, "zero_masks", f"mask_{i}.nii.gz")
-        label = 0
-        bag["image"].append(img_path)
-        bag["mask"].append(mask_path)
-        bag["label"].append(label)
-    
-    bags.append(bag)
-
-from test_data_set_prep import test_non_zero_img_unique
-test_non_zero_img_unique(bags)
-
-# %% 
-# create dataset and dataloader form the bags
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms as T
-# from test_data_set_prep import WMHDataset
-
-class WMHDataset(Dataset):
-    def __init__(self, bags, transform=None):
-        self.bags = bags
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.bags)
-
-    def __getitem__(self, idx):
-        bag = self.bags[idx]
-        img_paths = bag["image"]
-        mask_paths = bag["mask"]
-        label = int(sum(bag["label"]) > 0)
-        images = []
-        # masks = []
-        for img_path, mask_path in zip(img_paths, mask_paths):
-            img = nib.load(img_path).get_fdata()
-            # mask = nib.load(mask_path).get_fdata()
-            images.append(img)
-            # masks.append(mask)
-        if self.transform:
-            images = self.transform(images)
-            # masks = self.transform(masks)
-        return images, label
-
-transform = T.Compose([
-    T.ToTensor()
-])
-
-train_dataset = WMHDataset(bags, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
-
-for images, labels in train_loader:
-    print(images.shape)
-    print(labels)
-    break
-
-# %% Plot the patches in the bags 
-# import matplotlib.pyplot as plt
-# bags = bags[:10]
-# fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
-# for i, bag in enumerate(bags):
-#     for j, img_path in enumerate(bag["image"]):
-#         img = nib.load(img_path).get_fdata()
-#         ax = axes[i, j]
-#         ax.imshow(img, cmap='gray')
-#         ax.axis('off')
-
-# plt.subplots_adjust(wspace=0.1, hspace=0.1)
-# plt.show()
-
-# fig, axes = plt.subplots(len(bags), num_patches, figsize=(10, 10))
-# for i, bag in enumerate(bags):
-#     for j, img_path in enumerate(bag["mask"]):
-#         img = nib.load(img_path).get_fdata()
-#         ax = axes[i, j]
-#         ax.imshow(img, cmap='gray')
-#         ax.axis('off')
-
-# plt.subplots_adjust(wspace=0.1, hspace=0.1)
-# plt.show()
 # %%
