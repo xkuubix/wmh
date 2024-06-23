@@ -2,7 +2,6 @@ import os
 import json
 import math
 import numpy as np
-from tqdm import tqdm
 import nibabel as nib
 import multiprocessing
 
@@ -16,7 +15,7 @@ from test_data_set_prep import test_non_zero_img_unique
 save_path = '/media/dysk_a/jr_buler/WMH/patches'
 bags = []
 num_patches_percentage = []
-num_patches = 100
+num_patches = 1_00
 min_percentage = 1  # (1, 100)
 max_percentage = 15 # (1, 100)
 
@@ -27,20 +26,35 @@ with open(json_path, "r") as json_file:
 non_zero_indices = indices["non_zero_indices"]
 zero_indices = indices["zero_indices"]
 
-progress = 0
-pbar = tqdm(total=len(non_zero_indices), desc="Progress")
-while sum(num_patches_percentage) < len(non_zero_indices):
-    if np.random.rand() < 0.5:
-        num_patches_percentage.append(math.ceil(np.random.randint(min_percentage, max_percentage) * num_patches / 100))
-    else:
-        num_patches_percentage.append(0)
-    progress = sum(num_patches_percentage) / len(non_zero_indices) * 100
-    pbar.update(1)
-pbar.close()
+def generate_percentages(total_sum, num_patches, min_percentage=1, max_percentage=15):
+    result = []
+    # Calculate the remaining sum needed after zeros
+    remaining_sum = num_patches * (total_sum // 100)
+    
+    # Populate the rest of the list
+    while remaining_sum > 0:
+        value = np.random.randint(min_percentage, max_percentage)
+        if remaining_sum >= value:
+            result.append(value)
+            remaining_sum -= value
 
-if sum(num_patches_percentage) > len(non_zero_indices):
-    num_patches_percentage[-1] -= sum(num_patches_percentage) - len(non_zero_indices)
+    return result
 
+# Generate the list
+result = np.array(generate_percentages(total_sum=len(non_zero_indices),
+                                       num_patches=num_patches,
+                                       min_percentage=min_percentage,
+                                       max_percentage=max_percentage))
+zeros = np.zeros((len(result)))
+print(len(result))
+print(sum(result))
+num_patches_percentage = np.append(result, zeros).astype(int)
+np.random.shuffle(num_patches_percentage)
+num_patches_percentage = num_patches_percentage.tolist()
+import pandas as pd
+a = pd.DataFrame(num_patches_percentage)
+print(a.value_counts().sort_index())
+# %%
 def generate_bag(percentage):
     bag = {"image": [], "mask": [], "label": []}
     global non_zero_indices, zero_indices
@@ -69,7 +83,7 @@ def generate_bag(percentage):
     return bag
 
 pool = multiprocessing.Pool(processes=multiprocessing.cpu_count() - 2)
-bags = pool.map(generate_bag, num_patches_percentage)
+bags = pool.map(generate_bag, num_patches_percentage[:100])
 pool.close()
 pool.join()
 
