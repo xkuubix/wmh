@@ -1,5 +1,4 @@
 # %%
-import os
 import copy
 import uuid
 import yaml
@@ -17,7 +16,7 @@ from torchvision import transforms as T
 
 from choose_NCOS import choose_NCOS
 from net_utils import train_net, test_net
-from BrainWmhDataset import BrainWmhDataset, WMHDataset
+from BrainWmhDataset import BrainWmhDataset
 from torch.utils.data import random_split, DataLoader
 # from captum.attr import IntegratedGradients
 from captum.attr import LayerGradCam, LayerAttribution
@@ -96,24 +95,10 @@ transform = T.Compose([#T.RandomAffine(degrees=(0), translate=(0, 0.1)),
 transform = None
 
 
-# brain_train_val = BrainWmhDataset(root_dir=train_dir,
-#                                   mil_params=mil_params_train_val,
-#                                   transforms=transform,
-#                                   train=True)
-
-
-import pickle
-save_path = '/media/dysk_a/jr_buler/WMH/patches'
-dataset_path = os.path.join(save_path, "my_dataset.pickle")
-with open(dataset_path, 'rb') as data:
-    dataset = pickle.load(data)
-
-brain_train_val = dataset
-
-
-
-
-
+brain_train_val = BrainWmhDataset(root_dir=train_dir,
+                                  mil_params=mil_params_train_val,
+                                  transforms=transform,
+                                  train=True)
 
 total_size = len(brain_train_val)
 train_size = int(train_val_frac * total_size)  # x data for training
@@ -122,9 +107,9 @@ val_size = total_size - train_size
 brain_train, brain_val = random_split(brain_train_val,
                                       [train_size, val_size])
 
-# brain_val = copy.deepcopy(brain_val)
-# brain_val.dataset.train = True
-# del brain_train_val
+brain_val = copy.deepcopy(brain_val)
+brain_val.dataset.train = True
+del brain_train_val
 
 
 brain_test = BrainWmhDataset(root_dir=test_dir,
@@ -139,7 +124,7 @@ print('Test len', len(brain_test))
 #%%
 # gen data loaders
 train_loader = DataLoader(brain_train,
-                          batch_size=8,
+                          batch_size=batch_size,
                         #   shuffle=True,
                           num_workers=num_workers,
                           collate_fn=None,
@@ -147,7 +132,7 @@ train_loader = DataLoader(brain_train,
                           pin_memory=True
                           )
 val_loader = DataLoader(brain_val,
-                        batch_size=8,
+                        batch_size=batch_size,
                         #   shuffle=True,
                         num_workers=num_workers,
                         collate_fn=None,
@@ -155,7 +140,7 @@ val_loader = DataLoader(brain_val,
                         pin_memory=True
                         )
 test_loader = DataLoader(brain_test,
-                         batch_size=1,
+                         batch_size=batch_size,
                          #   shuffle=True,
                          num_workers=num_workers,
                          collate_fn=None,
@@ -177,8 +162,6 @@ data_loaders_sizes = {"train": dl_sizes[0],
                       "val": dl_sizes[1],
                       "test": dl_sizes[2],
                       }
-
-
 
 #%%
 # select NCOS
@@ -202,7 +185,7 @@ if 0:
     net.load_state_dict(std)
 
 # in theory batch size is 1 (in practice network sees batch size as concatenated slices)
-if 0:
+if 1:
     def deactivate_batchnorm(net):
         if isinstance(net, nn.BatchNorm2d):
             net.track_running_stats = False
@@ -210,43 +193,6 @@ if 0:
             net.running_var = None
             # net.momentum = 0.01
     net.apply(deactivate_batchnorm)
-
-
-#%%
-# train net, from scratch
-
-for epoch in range(EPOCHS):
-    net.train()
-    for i, data in enumerate(train_loader):
-        # get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
-        inputs = inputs.to(device)
-        labels = labels.view(batch_size, 1, 1).float().to(device)
-        # zero the parameter gradients
-        optimizer.zero_grad()
-        # forward + backward + optimize
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        # print statistics
-        if i % 10 == 0:
-            print(f'Epoch: {epoch}, Batch: {i}, Loss: {loss.item()}')
-
-    # Validation
-    net.eval()
-    with torch.no_grad():
-        for i, data in enumerate(val_loader):
-            inputs, labels = data
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
-            print(f'Epoch: {epoch}, Batch: {i}, Val Loss: {loss.item()}')
-
-
-
-
 #%%
 # TRAIN NETWORK---------------------------------------------------------------
 if config['run_with_neptune']:
