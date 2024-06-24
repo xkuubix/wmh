@@ -1,21 +1,55 @@
+# %%
 import os
-import json
 import math
+import json
+import yaml
+import argparse
+import torch
 import numpy as np
 import nibabel as nib
-import multiprocessing
+import multiprocessing as mp
 
 from torchvision import transforms as T
 from torchvision import transforms as T
 from torch.utils.data import Dataset, DataLoader
 from test_data_set_prep import test_non_zero_img_unique
 
+import time
+start_time = time.time()
+
 
 # %%
+
+def get_args_parser():
+    default = '/home/jr_buler/wmh/config.yml'
+    help = '''path to .yml config file
+    specyfying datasets/training params'''
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str,
+                        default=default,
+                        help=help)
+    return parser
+
+parser = get_args_parser()
+args, unknown = parser.parse_known_args()
+with open(args.config_path) as file:
+    config = yaml.load(file, Loader=yaml.FullLoader)
+
+
+#%%
+# set seed and device
+seed = config['seed']
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+device = torch.device(config['device'] if torch.cuda.is_available() else "cpu")
+# %%
+
 save_path = '/media/dysk_a/jr_buler/WMH/patches'
 bags = []
 num_patches_percentage = []
-num_patches = 1_00
+num_patches = 100
 min_percentage = 1  # (1, 100)
 max_percentage = 15 # (1, 100)
 
@@ -55,12 +89,18 @@ import pandas as pd
 a = pd.DataFrame(num_patches_percentage)
 print(a.value_counts().sort_index())
 # %%
+
+non_zero_indices = np.array(non_zero_indices)
+zero_indices = np.array(zero_indices)
+
 def generate_bag(percentage):
+    
+    global non_zero_indices, zero_indices, num_patches
     bag = {"image": [], "mask": [], "label": []}
-    global non_zero_indices, zero_indices
+
     non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
     if percentage != 0:
-        non_zero_indices = list(set(non_zero_indices) - set(non_zero_patches))
+        non_zero_indices = non_zero_indices[~np.isin(non_zero_indices, non_zero_patches)]
     for i in non_zero_patches:
         img_path = os.path.join(save_path, "non_zero_masks", f"img_{i}.nii.gz")
         mask_path = os.path.join(save_path, "non_zero_masks", f"mask_{i}.nii.gz")
@@ -71,7 +111,6 @@ def generate_bag(percentage):
     
     num_zero_patches = math.floor((num_patches * (100 - percentage)) / 100)  # percentage 0-100 
     zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=True)
-    # zero_indices = list(set(zero_indices) - set(zero_patches))
     for i in zero_patches:
         img_path = os.path.join(save_path, "zero_masks", f"img_{i}.nii.gz")
         mask_path = os.path.join(save_path, "zero_masks", f"mask_{i}.nii.gz")
@@ -82,11 +121,9 @@ def generate_bag(percentage):
     
     return bag
 
-pool = multiprocessing.Pool(processes=multiprocessing.cpu_count() - 2)
-bags = pool.map(generate_bag, num_patches_percentage[:100])
-pool.close()
-pool.join()
-
+# Multiprocessing pool
+with mp.Pool(processes=mp.cpu_count()-2) as pool:
+    bags = pool.map(generate_bag, num_patches_percentage)
 test_non_zero_img_unique(bags)
 
 # %% 
@@ -109,24 +146,43 @@ class WMHDataset(Dataset):
         images = []
         # masks = []
         for img_path, mask_path in zip(img_paths, mask_paths):
-            img = nib.load(img_path).get_fdata()
+            img = np.asarray(nib.load(img_path).dataobj)
+            img = torch.from_numpy(img)
+            img = img / img.max()
             # mask = nib.load(mask_path).get_fdata()
             images.append(img)
             # masks.append(mask)
+        images = torch.stack(images)
+        p, h, w = images.shape
+        images = images.unsqueeze(1).expand(p, 3, h, w)  # [patch, c, h, w])
+
         if self.transform:
             images = self.transform(images)
             # masks = self.transform(masks)
         return images, label
 
 transform = T.Compose([
-    T.ToTensor()
+    
 ])
+transform = None
 
 train_dataset = WMHDataset(bags, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
 
+
+
+
+import pickle
+dataset_path = os.path.join(save_path, "my_dataset.pickle")
+with open(dataset_path, 'wb') as output:
+    pickle.dump(train_dataset, output)
+
+# %%
 for images, labels in train_loader:
-    print(images.shape)
+    print(len(images))
+    print(images[0].shape)
     print(labels)
     break
+# %%
+print("--- %.2f seconds ---" % (time.time() - start_time))
 # %%
