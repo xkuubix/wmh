@@ -169,10 +169,8 @@ transform = None
 train_dataset = WMHDataset(bags, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
 
-
-
-
 import pickle
+save_path = '/media/dysk_a/jr_buler/WMH/patches'
 dataset_path = os.path.join(save_path, "my_dataset.pickle")
 with open(dataset_path, 'wb') as output:
     pickle.dump(train_dataset, output)

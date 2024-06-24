@@ -295,3 +295,46 @@ class BrainWmhDataset(torch.utils.data.Dataset):
 #     fig, axes = plt.subplots(1, 2)
 #     axes[0].imshow(brain[10]['bags'][6][x][0], cmap="gray", origin="lower")
 #     axes[1].imshow(brain[10]['masks'][6][x], cmap="gray", origin="lower")
+
+
+
+
+
+
+
+
+
+
+
+import nibabel as nib
+from torch.utils.data import Dataset
+class WMHDataset(Dataset):
+    def __init__(self, bags, transform=None):
+        self.bags = bags
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.bags)
+
+    def __getitem__(self, idx):
+        bag = self.bags[idx]
+        img_paths = bag["image"]
+        mask_paths = bag["mask"]
+        label = int(sum(bag["label"]) > 0)
+        images = []
+        # masks = []
+        for img_path, mask_path in zip(img_paths, mask_paths):
+            img = np.asarray(nib.load(img_path).dataobj)
+            img = torch.from_numpy(img)
+            img = img / img.max()
+            # mask = nib.load(mask_path).get_fdata()
+            images.append(img)
+            # masks.append(mask)
+        images = torch.stack(images)
+        p, h, w = images.shape
+        images = images.unsqueeze(1).expand(p, 3, h, w)  # [patch, c, h, w])
+
+        if self.transform:
+            images = self.transform(images)
+            # masks = self.transform(masks)
+        return images, label
