@@ -101,20 +101,6 @@ brain_train_val = BrainWmhDataset(root_dir=train_dir,
                                   transforms=transform,
                                   train=True)
 
-
-import pickle
-save_path = '/media/dysk_a/jr_buler/WMH/patches'
-dataset_path = os.path.join(save_path, "my_dataset.pickle")
-with open(dataset_path, 'rb') as data:
-    dataset = pickle.load(data)
-
-
-
-
-
-
-
-
 total_size = len(brain_train_val)
 train_size = int(train_val_frac * total_size)  # x data for training
 val_size = total_size - train_size
