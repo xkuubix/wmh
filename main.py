@@ -99,7 +99,6 @@ brain_train_val = BrainWmhDataset(root_dir=train_dir,
                                   mil_params=mil_params_train_val,
                                   transforms=transform,
                                   train=True)
-
 total_size = len(brain_train_val)
 train_size = int(train_val_frac * total_size)  # x data for training
 val_size = total_size - train_size
