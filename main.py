@@ -1,4 +1,5 @@
 # %%
+import os
 import copy
 import uuid
 import yaml
@@ -16,7 +17,7 @@ from torchvision import transforms as T
 
 from choose_NCOS import choose_NCOS
 from net_utils import train_net, test_net
-from BrainWmhDataset import BrainWmhDataset
+from BrainWmhDataset import BrainWmhDataset, WMHDataset
 from torch.utils.data import random_split, DataLoader
 # from captum.attr import IntegratedGradients
 from captum.attr import LayerGradCam, LayerAttribution
@@ -99,6 +100,21 @@ brain_train_val = BrainWmhDataset(root_dir=train_dir,
                                   mil_params=mil_params_train_val,
                                   transforms=transform,
                                   train=True)
+
+
+import pickle
+save_path = '/media/dysk_a/jr_buler/WMH/patches'
+dataset_path = os.path.join(save_path, "my_dataset.pickle")
+with open(dataset_path, 'rb') as data:
+    dataset = pickle.load(data)
+
+
+
+
+
+
+
+
 total_size = len(brain_train_val)
 train_size = int(train_val_frac * total_size)  # x data for training
 val_size = total_size - train_size
