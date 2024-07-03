@@ -20,6 +20,7 @@ training_plan:
   architectures:
     # amil, gamil, l_dsmil, nl_dsmil, gmamil, clam_sb, clam_mb
     names: 'gamil'
+    size: 'small'
     dropout: True #p=0.25
   parameters:
     batch_size: 1

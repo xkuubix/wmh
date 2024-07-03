@@ -71,6 +71,7 @@ wd = config['training_plan']['parameters']['wd'][0]
 grad_accu = config['training_plan']['parameters']['grad_accu']['is_on']
 grad_accu_steps = config['training_plan']['parameters']['grad_accu']['steps']
 net_ar = config['training_plan']['architectures']['names']
+net_size = config['training_plan']['architectures']['size']
 net_ar_dropout = config['training_plan']['architectures']['dropout']
 criterion_type = config['training_plan']['criterion']
 optimizer_type = config['training_plan']['optim_name']
@@ -101,6 +102,14 @@ brain_train_val = BrainWmhDataset(root_dir=train_dir,
                                   transforms=transform,
                                   train=True)
 
+
+# import pickle
+# save_path = '/media/dysk_a/jr_buler/WMH/patches'
+# dataset_path = os.path.join(save_path, "my_dataset.pickle")
+# with open(dataset_path, 'rb') as data:
+#     brain_train_val = pickle.load(data)
+
+
 total_size = len(brain_train_val)
 train_size = int(train_val_frac * total_size)  # x data for training
 val_size = total_size - train_size
@@ -108,9 +117,9 @@ val_size = total_size - train_size
 brain_train, brain_val = random_split(brain_train_val,
                                       [train_size, val_size])
 
-brain_val = copy.deepcopy(brain_val)
-brain_val.dataset.train = True
-del brain_train_val
+# brain_val = copy.deepcopy(brain_val)
+# brain_val.dataset.train = True
+# del brain_train_val
 
 
 brain_test = BrainWmhDataset(root_dir=test_dir,
@@ -168,6 +177,7 @@ data_loaders_sizes = {"train": dl_sizes[0],
 # select NCOS
 net, criterion, optimizer, scheduler = choose_NCOS(
     net_ar=net_ar,
+    net_size=net_size,
     dropout=net_ar_dropout,
     device=device,
     pretrained=True,
@@ -275,7 +285,8 @@ if 0:
                     #  + '2d111a3b-0b6a-4735-be81-6dae96b39759',
                     #  + 'debe6bb9-8f7c-4937-a05c-4c82525b5157',
                     #  + 'ee71998c-e395-4c43-8754-092893ba0f58',
-                     + '54861e2e-e6a0-4c89-a3b1-1bf293f0bb47',
+                    #  + '54861e2e-e6a0-4c89-a3b1-1bf293f0bb47',
+                     + '8ee1293f-428e-46fa-b3fd-68be52754c0a',
                     #  + '34f54771-8112-4403-8226-0a4c3f5b4b76',
                      map_location=device)
     net.load_state_dict(std)

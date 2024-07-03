@@ -11,7 +11,9 @@ from mil_net_architectures import CLAM_SB, CLAM_MB
 from torch.optim import lr_scheduler
 
 
-def choose_NCOS(net_ar: str, dropout: bool,
+def choose_NCOS(net_ar: str,
+                net_size: str,
+                dropout: bool,
                 device: str,
                 pretrained: bool,
                 criterion_type: str,
@@ -69,7 +71,8 @@ def choose_NCOS(net_ar: str, dropout: bool,
         net = AttentionMIL(num_classes=num_out,
                            pretrained=pretrained,
                            gated=False,
-                           dropout=dropout)
+                           dropout=dropout,
+                           size_arg=net_size)
         # if torch.cuda.device_count() == 2:
         # net = nn.DataParallel(net, device_ids=[0, 1])
         net.to(device)
@@ -79,7 +82,7 @@ def choose_NCOS(net_ar: str, dropout: bool,
                            pretrained=pretrained,
                            gated=True,
                            dropout=dropout,
-                           size_arg='small')
+                           size_arg=net_size)
         # if torch.cuda.device_count() == 2:
         #     net = nn.DataParallel(net, device_ids=[0, 1])
         net.to(device)
