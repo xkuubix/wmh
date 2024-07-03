@@ -78,7 +78,8 @@ def choose_NCOS(net_ar: str, dropout: bool,
         net = AttentionMIL(num_classes=num_out,
                            pretrained=pretrained,
                            gated=True,
-                           dropout=dropout)
+                           dropout=dropout,
+                           size_arg='small')
         # if torch.cuda.device_count() == 2:
         #     net = nn.DataParallel(net, device_ids=[0, 1])
         net.to(device)
