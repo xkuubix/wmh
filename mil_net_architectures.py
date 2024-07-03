@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import numpy as np
 from torchvision import models
 from batch_idx_sel import batched_index_select
+from torchvision.models.resnet import ResNet18_Weights
+
 # import torch_resnet #po co to było?
 # from nystrom_attention import NystromAttention
 # from monai.networks.nets import EfficientNetBN
@@ -88,26 +90,33 @@ class AttentionMIL(nn.Module):
                 gated=False,
                 pretrained=True,
                 dropout=False,
-                size_arg="small"):
+                size_arg="big"):
 
         super().__init__()
-        self.size_dict = {"small": [512, 256, 128], "big": [512, 256, 256],
-                          "tiny": [64, 32, 32]}
+        self.size_dict = {"medium": [512, 256, 128], "big": [512, 256, 256],
+                          "tiny": [64, 32, 32], "small": [256, 128, 64]}
         size = self.size_dict[size_arg]
         self.is_pe = False
         self.cat = False
         self.A = None
 
-        # self.feature_extractor = torch_resnet.ResNet20()
-        # self.num_features = 64
-
-        if pretrained:
-            from torchvision.models.resnet import ResNet18_Weights
-            self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
-        else:
-            self.feature_extractor = models.resnet18()
-        self.num_features = self.feature_extractor.fc.in_features
-        self.feature_extractor.fc = Identity()
+        # size big
+        if size_arg == 'big':
+            if pretrained:
+                self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+            else:
+                self.feature_extractor = models.resnet18()
+            # self.num_features = self.feature_extractor.fc.in_features
+            self.num_features = size[0]
+            self.feature_extractor.fc = Identity()
+        # size small
+        elif size_arg == 'small':
+        # use 6 blocks (output -1, 256, 3, 3 before adaptive avg pool for 33x33 input)
+        # use 6 blocks (output -1, 256, 2, 2 before adaptive avg pool for 32x32 input)
+        # adjust gradcam interpolation
+            self.feature_extractor = nn.Sequential(*list(models.resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-3],
+                                                nn.AdaptiveAvgPool2d(1), nn.Flatten())
+            self.num_features = size[0]
 
         self.patch_extractor = nn.Sequential(nn.Linear(size[0], size[1]),
                                              nn.ReLU())
