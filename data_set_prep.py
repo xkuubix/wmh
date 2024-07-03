@@ -112,25 +112,18 @@ seed = config['seed']
 np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
-device = torch.device(config['device'] if torch.cuda.is_available() else "cpu")
-# dataloaders args
-train_val_frac = config['data_sets']['split_fraction_train_val']
-batch_size = config['training_plan']['parameters']['batch_size']
-num_workers = config['data_sets']['num_workers']
-class_names = config['data_sets']['class_names']
-
-# image parameters
 patch_size = config['data_sets']['patch_size']
 overlap_train_val = config['data_sets']['overlap_train_val']
-overlap_test = config['data_sets']['overlap_test']
+
+overlap_train_val = 0.75
+
 
 mil_params_train_val = {'patch_size': patch_size,
                         'overlap': overlap_train_val}
-mil_params_test = {'patch_size': patch_size,
-                   'overlap': overlap_test}
 
 train_dir = config['dir']['train']
-test_dir = config['dir']['test']
+
+train_val_split = config['data_sets']['split_fraction_train_val']
 
 # %% Search files in the directory
 root = train_dir
@@ -148,90 +141,125 @@ for root, dirs, files in os.walk(root, topdown=False):
         if f.__contains__('wmh.nii'):
             brain['mask'].append(f)
 
+# Shuffle brain dictionary
+indices = np.arange(len(brain['image']))
+np.random.shuffle(indices)
+train_ind, val_ind = np.split(indices, [int(train_val_split*len(indices))])
+
+brain_train = {}
+brain_val = {}
+
+brain_train['image'] = [brain['image'][i] for i in train_ind]
+brain_train['brain_mask'] = [brain['brain_mask'][i] for i in train_ind]
+brain_train['mask'] = [brain['mask'][i] for i in train_ind]
+
+brain_val['image'] = [brain['image'][i] for i in val_ind]
+brain_val['brain_mask'] = [brain['brain_mask'][i] for i in val_ind]
+brain_val['mask'] = [brain['mask'][i] for i in val_ind]
+
 # %% Load images and masks, create patches and save them to the folder
-non_zero_indices = []
-zero_indices = []
-ii = 0
-save_path = '/media/dysk_a/jr_buler/WMH/patches'
 
-for i, (img_path, brain_path, mask_path) in enumerate(zip(brain['image'], brain['brain_mask'], brain['mask'])):
-    img = np.asarray(nib.load(img_path).dataobj)
-    mask = np.asarray(nib.load(mask_path).dataobj)
-    brain = np.asarray(nib.load(brain_path).dataobj)
+for subset in {'train', 'val'}:
+    save_path = '/media/dysk_a/jr_buler/WMH/patches'
+    non_zero_indices = []
+    zero_indices = []
+    ii = 0
 
-    tiles = get_tiles(img.shape[0],
-                      img.shape[1],
-                      patch_size,
-                      patch_size,
-                      overlap=overlap_train_val)
+    if subset == 'train':
+        brain = brain_train
+    else:
+        brain = brain_val
 
-    img = torch.from_numpy(img)
-    mask = torch.from_numpy(mask)
-    brain = torch.from_numpy(brain)
+    save_path = os.path.join(save_path, subset)
 
-    img = img.permute(2, 0, 1)    # shape [slice, h, w]
-    mask = mask.permute(2, 0, 1)
-    brain = brain.permute(2, 0, 1)
+    for i, (img_path, brain_path, mask_path) in enumerate(zip(brain['image'], brain['brain_mask'], brain['mask'])):
+        img = np.asarray(nib.load(img_path).dataobj)
+        mask = np.asarray(nib.load(mask_path).dataobj)
+        brain = np.asarray(nib.load(brain_path).dataobj)
 
-    img = torch.mul(img, brain, )
+        tiles = get_tiles(img.shape[0],
+                        img.shape[1],
+                        patch_size,
+                        patch_size,
+                        overlap=overlap_train_val)
+
+        img = torch.from_numpy(img)
+        mask = torch.from_numpy(mask)
+        brain = torch.from_numpy(brain)
+
+        img = img.permute(2, 0, 1)    # shape [slice, h, w]
+        mask = mask.permute(2, 0, 1)
+        brain = brain.permute(2, 0, 1)
+
+        img = torch.mul(img, brain, )
+        
+        # deleting 'other patology' mask labels
+        # mask_bag[mask_bag==2.0] = 0.
+        mask[mask==2.0] = 0.
+
+        img_bag, img_coords = convert_img_to_bag(image=img,
+                                                tiles=tiles)
+
+
+        mask_bag, mask_coords = convert_img_to_bag(image=mask,
+                                                tiles=tiles)
+        
+        # patch x slice x h x w -> patch*slice x h x w
+        whole_img_bag = img_bag.view(-1, img_bag.shape[2], img_bag.shape[3])
+        whole_mask_bag = mask_bag.view(-1, mask_bag.shape[2], mask_bag.shape[3])
+
+        ### Discard patches under certain threshold of non-zero pixels
+        patch_idx = []
+        patches_to_keep = []
+        for patch in range(whole_img_bag.shape[0]):
+            if torch.count_nonzero(whole_img_bag[patch, :, :]) >= (0.9*patch_size**2):
+                patches_to_keep.append(patch)
     
-    # deleting 'other patology' mask labels
-    # mask_bag[mask_bag==2.0] = 0.
-    mask[mask==2.0] = 0.
+        patch_idx.append(patches_to_keep)
+        whole_img_bag = whole_img_bag[patches_to_keep, :, :]
+        whole_mask_bag = whole_mask_bag[patches_to_keep, :, :]
+        ### Less memory required for data storage
 
-    img_bag, img_coords = convert_img_to_bag(image=img,
-                                               tiles=tiles)
+        for img, mask in zip(whole_img_bag, whole_mask_bag):
+            if torch.sum(mask) > 0:
+                non_zero_indices.append(ii)
+                # Save img patch to folder for non-zero masks
+                folder_path = os.path.join(save_path, "non_zero_masks")
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
+                img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
+                mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
+                nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
+                # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
+            else:
+                zero_indices.append(ii)
+                # Save img patch to folder for zero masks
+                folder_path = os.path.join(save_path, "zero_masks")
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
+                img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
+                mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
+                nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
+                # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
+            ii += 1
 
+    if subset == 'train':
+        non_zero_indices_train = non_zero_indices
+        zero_indices_train = zero_indices
+    else:
+        non_zero_indices_val = non_zero_indices
+        zero_indices_val = zero_indices
 
-    mask_bag, mask_coords = convert_img_to_bag(image=mask,
-                                               tiles=tiles)
-    
-    # patch x slice x h x w -> patch*slice x h x w
-    whole_img_bag = img_bag.view(-1, img_bag.shape[2], img_bag.shape[3])
-    whole_mask_bag = mask_bag.view(-1, mask_bag.shape[2], mask_bag.shape[3])
-
-    ### Discard patches under certain threshold of non-zero pixels
-    patch_idx = []
-    patches_to_keep = []
-    for patch in range(whole_img_bag.shape[0]):
-        if torch.count_nonzero(whole_img_bag[patch, :, :]) >= (0.9*patch_size**2):
-            patches_to_keep.append(patch)
-   
-    patch_idx.append(patches_to_keep)
-    whole_img_bag = whole_img_bag[patches_to_keep, :, :]
-    whole_mask_bag = whole_mask_bag[patches_to_keep, :, :]
-    ### Less memory required for data storage
-
-    for img, mask in zip(whole_img_bag, whole_mask_bag):
-        if torch.sum(mask) > 0:
-            non_zero_indices.append(ii)
-            # Save img patch to folder for non-zero masks
-            folder_path = os.path.join(save_path, "non_zero_masks")
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-            img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
-            mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
-            nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
-            # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
-        else:
-            zero_indices.append(ii)
-            # Save img patch to folder for zero masks
-            folder_path = os.path.join(save_path, "zero_masks")
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-            img_path = os.path.join(folder_path, f"img_{ii}.nii.gz")
-            mask_path = os.path.join(folder_path, f"mask_{ii}.nii.gz")
-            nib.save(nib.Nifti1Image(img.numpy(), np.eye(4)), img_path)
-            # nib.save(nib.Nifti1Image(mask.numpy(), np.eye(4)), mask_path)
-        ii += 1
    
 # Save non_zero_indices and zero_indices to JSON file
-indices = {
-    "non_zero_indices": non_zero_indices,
-    "zero_indices": zero_indices
-}
+indices = {"non_zero_indices_train": non_zero_indices_train,
+            "zero_indices_train": zero_indices_train,
+            "non_zero_indices_val": non_zero_indices_val,
+            "zero_indices_val": zero_indices_val}
 
-json_path = os.path.join(save_path, "bag_info.json")
+# %%
+path = '/media/dysk_a/jr_buler/WMH/patches'
+json_path = os.path.join(path, "bag_info.json")
 with open(json_path, "w") as json_file:
     json.dump(indices, json_file)
 # %%

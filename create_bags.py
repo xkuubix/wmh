@@ -44,22 +44,27 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 device = torch.device(config['device'] if torch.cuda.is_available() else "cpu")
+patch_size = config['data_sets']['patch_size']
 # %%
 
 save_path = '/media/dysk_a/jr_buler/WMH/patches'
 bags = []
 num_patches_percentage = []
-num_patches = 100
-min_percentage = 1  # (1, 100)
+num_patches = 200
+min_percentage = 5  # (1, 100)
 max_percentage = 15 # (1, 100)
 
 json_path = os.path.join(save_path, "bag_info.json")
 with open(json_path, "r") as json_file:
     indices = json.load(json_file)
 
-non_zero_indices = indices["non_zero_indices"]
-zero_indices = indices["zero_indices"]
+non_zero_indices_train = np.array(indices["non_zero_indices_train"])
+zero_indices_train = np.array(indices["zero_indices_train"])
 
+non_zero_indices_val = np.array(indices["non_zero_indices_val"])
+zero_indices_val = np.array(indices["zero_indices_val"])
+
+# %%
 def generate_percentages(total_sum, num_patches, min_percentage=1, max_percentage=15):
     result = []
     # Calculate the remaining sum needed after zeros
@@ -75,35 +80,62 @@ def generate_percentages(total_sum, num_patches, min_percentage=1, max_percentag
     return result
 
 # Generate the list
-result = np.array(generate_percentages(total_sum=len(non_zero_indices),
+result_train = np.array(generate_percentages(total_sum=len(non_zero_indices_train),
                                        num_patches=num_patches,
                                        min_percentage=min_percentage,
                                        max_percentage=max_percentage))
-zeros = np.zeros((len(result)))
-print(len(result))
-print(sum(result))
-num_patches_percentage = np.append(result, zeros).astype(int)
-np.random.shuffle(num_patches_percentage)
-num_patches_percentage = num_patches_percentage.tolist()
+zeros_train = np.zeros((len(result_train)))
+
+result_val = np.array(generate_percentages(total_sum=len(non_zero_indices_val),
+                                        num_patches=num_patches,
+                                        min_percentage=min_percentage,
+                                        max_percentage=max_percentage))
+zeros_val = np.zeros((len(result_val)))
+
+
+print(len(result_train))
+print(sum(result_train))
+print(len(result_val))
+print(sum(result_val))
+
+
+num_patches_percentage_train = np.append(result_train, zeros_train).astype(int)
+np.random.shuffle(num_patches_percentage_train)
+num_patches_percentage_train = num_patches_percentage_train.tolist()
+
+num_patches_percentage_val = np.append(result_val, zeros_val).astype(int)
+np.random.shuffle(num_patches_percentage_val)
+num_patches_percentage_val = num_patches_percentage_val
+
+
 import pandas as pd
-a = pd.DataFrame(num_patches_percentage)
+a = pd.DataFrame(num_patches_percentage_train)
+print(a.value_counts().sort_index())
+a = pd.DataFrame(num_patches_percentage_val)
 print(a.value_counts().sort_index())
 # %%
 
-non_zero_indices = np.array(non_zero_indices)
-zero_indices = np.array(zero_indices)
-
 def generate_bag(percentage):
     
-    global non_zero_indices, zero_indices, num_patches
+    global subset, non_zero_indices_train, zero_indices_train, non_zero_indices_val, zero_indices_val
+    
+    if subset == "train":
+        non_zero_indices = non_zero_indices_train
+        zero_indices = zero_indices_train
+        path = os.path.join(save_path, "train")
+    else:
+        non_zero_indices = non_zero_indices_val
+        zero_indices = zero_indices_val
+        path = os.path.join(save_path, "val")
+
     bag = {"image": [], "mask": [], "label": []}
 
     non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
     if percentage != 0:
         non_zero_indices = non_zero_indices[~np.isin(non_zero_indices, non_zero_patches)]
     for i in non_zero_patches:
-        img_path = os.path.join(save_path, "non_zero_masks", f"img_{i}.nii.gz")
-        mask_path = os.path.join(save_path, "non_zero_masks", f"mask_{i}.nii.gz")
+        img_path = os.path.join(path, "non_zero_masks", f"img_{i}.nii.gz")
+        mask_path = os.path.join(path, "non_zero_masks", f"mask_{i}.nii.gz")
         label = 1
         bag["image"].append(img_path)
         bag["mask"].append(mask_path)
@@ -112,8 +144,8 @@ def generate_bag(percentage):
     num_zero_patches = math.floor((num_patches * (100 - percentage)) / 100)  # percentage 0-100 
     zero_patches = np.random.choice(zero_indices, size=num_zero_patches, replace=True)
     for i in zero_patches:
-        img_path = os.path.join(save_path, "zero_masks", f"img_{i}.nii.gz")
-        mask_path = os.path.join(save_path, "zero_masks", f"mask_{i}.nii.gz")
+        img_path = os.path.join(path, "zero_masks", f"img_{i}.nii.gz")
+        mask_path = os.path.join(path, "zero_masks", f"mask_{i}.nii.gz")
         label = 0
         bag["image"].append(img_path)
         bag["mask"].append(mask_path)
@@ -122,9 +154,17 @@ def generate_bag(percentage):
     return bag
 
 # Multiprocessing pool
+subset = "train"
 with mp.Pool(processes=mp.cpu_count()-2) as pool:
-    bags = pool.map(generate_bag, num_patches_percentage)
-test_non_zero_img_unique(bags)
+    bags_train = pool.map(generate_bag, num_patches_percentage_train)
+test_non_zero_img_unique(bags_train)
+
+subset = "val"
+with mp.Pool(processes=mp.cpu_count()-2) as pool:
+    bags_val = pool.map(generate_bag, num_patches_percentage_val)
+test_non_zero_img_unique(bags_val)
+
+
 
 # %% 
 # create dataset and dataloader form the bags
@@ -161,26 +201,37 @@ class WMHDataset(Dataset):
             # masks = self.transform(masks)
         return images, label
 
-transform = T.Compose([
-    
+transform_train = T.Compose([
+    T.RandomHorizontalFlip(),
+    T.RandomVerticalFlip(),
+    T.RandomRotation(90),
+    T.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+    T.RandomResizedCrop(patch_size, scale=(0.8, 1.0)),
 ])
-transform = None
+transform_val = None
 
-train_dataset = WMHDataset(bags, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
+train_dataset = WMHDataset(bags_train, transform=transform_train)
+val_dataset = WMHDataset(bags_val, transform=transform_val)
 
+# %%
 import pickle
 save_path = '/media/dysk_a/jr_buler/WMH/patches'
-dataset_path = os.path.join(save_path, "my_dataset.pickle")
+dataset_path = os.path.join(save_path, "train_dataset.pickle")
 with open(dataset_path, 'wb') as output:
     pickle.dump(train_dataset, output)
 
-# %%
-for images, labels in train_loader:
-    print(len(images))
-    print(images[0].shape)
-    print(labels)
-    break
+dataset_path = os.path.join(save_path, "val_dataset.pickle")
+with open(dataset_path, 'wb') as output:
+    pickle.dump(val_dataset, output)
+
+
 # %%
 print("--- %.2f seconds ---" % (time.time() - start_time))
+# %%
+# train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=0)
+# for images, labels in train_loader:
+#     print(len(images))
+    # print(images[0].shape)
+    # print(labels)
+    # break
 # %%
