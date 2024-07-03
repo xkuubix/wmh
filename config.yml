@@ -12,9 +12,9 @@ data_sets:
   split_fraction_train_val: 0.8  
   class_names: ['Normal' ,'WMH']
 
-  patch_size: 33
-  overlap_train_val: 0.9375 # 0.9375
-  overlap_test: 0.875     # 0.9375
+  patch_size: 32 # 33 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  overlap_train_val: 0.96875 # 0.9375 || 0,96875 for patch size 32, it produces 1 px stride in overlap
+  overlap_test: 0.96875     # 0.875
 
 training_plan:
   architectures:
