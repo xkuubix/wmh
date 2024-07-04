@@ -26,13 +26,14 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 #%%
 def get_args_parser():
-    default = '/home/jr_buler/wmh/config.yml'
+    home_dir = os.path.expanduser("~")
+    default_config_path = os.path.join(home_dir, 'wmh', 'config.yml')
     help = '''path to .yml config file
     specyfying datasets/training params'''
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str,
-                        default=default,
+                        default=default_config_path,
                         help=help)
     return parser
 
