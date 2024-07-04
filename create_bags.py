@@ -77,7 +77,6 @@ def generate_percentages(total_sum, num_patches, min_percentage=1, max_percentag
             result.append(value)
             remaining_sum -= value
         else:
-            result.append(remaining_sum)
             remaining_sum = 0
 
     return result
@@ -133,7 +132,8 @@ def generate_bag(percentage):
 
     bag = {"image": [], "mask": [], "label": []}
 
-    non_zero_patches = np.random.choice(non_zero_indices, size=percentage, replace=False)
+    num_non_zero_patches = math.ceil((num_patches * percentage) / 100)  # percentage 0-100 
+    non_zero_patches = np.random.choice(non_zero_indices, size=num_non_zero_patches, replace=False)
     if percentage != 0:
         non_zero_indices = non_zero_indices[~np.isin(non_zero_indices, non_zero_patches)]
     for i in non_zero_patches:
