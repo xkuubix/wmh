@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.ERROR)
 #%%
 def get_args_parser():
-    home_dir = os.path.expanduser("~")
-    default_config_path = os.path.join(home_dir, 'wmh', 'config.yml')
+    yaml_dir = os.getcwd()
+    default_config_path = os.path.join(yaml_dir, 'config.yml')
     help = '''path to .yml config file
     specyfying datasets/training params'''
 

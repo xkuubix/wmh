@@ -21,13 +21,14 @@ start_time = time.time()
 # %%
 
 def get_args_parser():
-    default = '/home/jr_buler/wmh/config.yml'
+    yaml_dir = os.getcwd()
+    default_config_path = os.path.join(yaml_dir, 'config.yml')
     help = '''path to .yml config file
     specyfying datasets/training params'''
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str,
-                        default=default,
+                        default=default_config_path,
                         help=help)
     return parser
 
