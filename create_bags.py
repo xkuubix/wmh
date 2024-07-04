@@ -51,8 +51,8 @@ save_path = '/media/dysk_a/jr_buler/WMH/patches'
 bags = []
 num_patches_percentage = []
 num_patches = 200
-min_percentage = 5  # (1, 100)
-max_percentage = 15 # (1, 100)
+min_percentage = 10  # (1, 100)
+max_percentage = 50 # (1, 100)
 
 json_path = os.path.join(save_path, "bag_info.json")
 with open(json_path, "r") as json_file:
@@ -76,6 +76,9 @@ def generate_percentages(total_sum, num_patches, min_percentage=1, max_percentag
         if remaining_sum >= value:
             result.append(value)
             remaining_sum -= value
+        else:
+            result.append(remaining_sum)
+            remaining_sum = 0
 
     return result
 
