@@ -101,7 +101,7 @@ class AttentionMIL(nn.Module):
         self.A = None
 
         # size big
-        if size_arg == 'big':
+        if size_arg == 'medium':
             if pretrained:
                 self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
             else:
