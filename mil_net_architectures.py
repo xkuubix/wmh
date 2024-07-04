@@ -94,29 +94,32 @@ class AttentionMIL(nn.Module):
 
         super().__init__()
         self.size_dict = {"medium": [512, 256, 128], "big": [512, 256, 256],
-                          "tiny": [64, 32, 32], "small": [256, 128, 64]}
+                          "tiny": [128, 64, 64], "small": [256, 128, 64]}
         size = self.size_dict[size_arg]
+        self.num_features = size[0]
         self.is_pe = False
         self.cat = False
         self.A = None
 
         # size big
-        if size_arg == 'medium':
+        if size_arg == 'medium': # 11.2M params // feature extractor
             if pretrained:
                 self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
             else:
                 self.feature_extractor = models.resnet18()
             # self.num_features = self.feature_extractor.fc.in_features
-            self.num_features = size[0]
             self.feature_extractor.fc = Identity()
         # size small
-        elif size_arg == 'small':
+        elif size_arg == 'small': # 2.2M params // feature extractor
         # use 6 blocks (output -1, 256, 3, 3 before adaptive avg pool for 33x33 input)
         # use 6 blocks (output -1, 256, 2, 2 before adaptive avg pool for 32x32 input)
-        # adjust gradcam interpolation
             self.feature_extractor = nn.Sequential(*list(models.resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-3],
                                                 nn.AdaptiveAvgPool2d(1), nn.Flatten())
-            self.num_features = size[0]
+        elif size_arg == 'tiny': # 683k params // feature extractor
+        # (output -1, 128, 5, 5 before adaptive avg pool for 33x33 input)
+        # (output -1, 128, 4, 4 before adaptive avg pool for 32x32 input)
+            self.feature_extractor = nn.Sequential(*list(models.resnet18(weights=ResNet18_Weights.DEFAULT).children())[:-4],
+                                                nn.AdaptiveAvgPool2d(1), nn.Flatten())
 
         self.patch_extractor = nn.Sequential(nn.Linear(size[0], size[1]),
                                              nn.ReLU())
