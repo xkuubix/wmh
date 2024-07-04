@@ -113,7 +113,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         
         logger.info(f'image shape: {brain["image"].shape}')
         # select only positive slices
-        if False:
+        if True:
             columns_to_keep = []
             # import matplotlib.pyplot as plt
             # plt.imshow(patch_labels.T)
@@ -148,7 +148,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
 
         logger.info(f'patch_labels shape: {patch_labels.shape}')
         # randomize slice label by randomly zeroing image ROIs and masks
-        if False:#self.train:
+        if True:#self.train:
             for item in range(patch_labels.shape[1]): # shape[1] = n_slices            
                 if (torch.rand(1).item()  >= 0.5):
                     img_bag[patch_labels[:, item].type(torch.BoolTensor), item, :, :] = 0.
@@ -193,6 +193,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
         target = 1.0*(non_zero_count.sum(1) > 0)
 
 
+        total_slices = img_bag.shape[0]
         # img_bag.shape ~ torch.Size([15, 210, 3, 33, 33])
         # select patches with non-zero pixels (threshold 0.9)
         img = []
@@ -219,7 +220,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                      'img_size': (h, w), 'tiles': tiles, 'patch_id': patch_idx,
                      'full_image': brain['image'],
                      'full_mask': brain['mask'][masks_to_keep, :, :],
-                     'slices_taken': masks_to_keep,
+                     'slices_taken': masks_to_keep, 'total_slices': total_slices,
                      'mri_file_path': mri_file_path,
                      'mask_file_path': mask_file_path}
 
