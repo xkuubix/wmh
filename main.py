@@ -212,7 +212,7 @@ if config['run_with_neptune']:
 else:
     neptune_run = None
 
-if 1:
+if 0:
     state_dict_BL, state_dict_BACC, loss_stats, accuracy_stats = train_net(
         net, data_loaders,
         data_loaders_sizes,
@@ -225,18 +225,18 @@ if 1:
         accum_steps=grad_accu_steps
         )
 
-unique_filename1 = str(uuid.uuid4())
-model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
-                    + unique_filename1)
-torch.save(state_dict_BACC, model_save_path)
+    unique_filename1 = str(uuid.uuid4())
+    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
+                        + unique_filename1)
+    torch.save(state_dict_BACC, model_save_path)
 
-unique_filename2 = str(uuid.uuid4())
-model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
-                    + unique_filename2)
-torch.save(state_dict_BL, model_save_path)
+    unique_filename2 = str(uuid.uuid4())
+    model_save_path = (config['dir']['root'] + 'neptune_saved_models/'
+                        + unique_filename2)
+    torch.save(state_dict_BL, model_save_path)
 #%%
 # TEST NETWORK----------------------------------------------------------------
-if 1:
+if 0:
     # test best val accuracy model
     net_BACC = net
     net_BACC.load_state_dict(state_dict_BACC)
@@ -278,7 +278,7 @@ if 1:
 if neptune_run:
     neptune_run.stop()
 # %%
-if 0:
+if 1:
 
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
@@ -392,7 +392,7 @@ if 0:
                 attention_map /= torch.max(attention_map.reshape(-1))
 
 
-                percentile = 98 # 95
+                percentile = 95 # 95
                 image = attribution_map.clone()
                 # image = attention_map.clone()
                 threshold = np.percentile(image, percentile)
