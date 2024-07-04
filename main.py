@@ -422,6 +422,8 @@ if 1:
                     title = 'Case: '
                     title += d_s[1]['mri_file_path'].split('/dataverse_files')[-1].split('/pre')[0]
                     title += '   Slice number: ' + str(d_s[1]['slices_taken'][slice_number])
+                    title += '/' + str(d_s[1]['total_slices'])
+
                     fig.suptitle(title, fontsize=30)
 
                     # # _, pred = torch.max(output[0].reshape(-1, 4), 1)
