@@ -1,7 +1,7 @@
+import gc
 import time
 import copy
 import torch
-
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -218,6 +218,7 @@ def train_net(net, dataloaders,
     print(f'Best val Loss: {best_loss:4f}')
     # clear memory usage that may stay after training
     torch.cuda.empty_cache()
+    gc.collect()
     # load best net weights
     # net.load_state_dict(best_net_wts)
 
