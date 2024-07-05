@@ -149,7 +149,7 @@ def train_net(net, dataloaders,
                     if grad_acc_mode and phase == 'train':
                         phase_loss += loss.detach().item() * accum_steps
                     else:
-                        phase_loss += loss.detach().item()
+                        phase_loss += loss.detach().item() * images.size(0)
                     if str(criterion) == 'BCELoss()':
                         # print(preds, labels)
                         phase_corrects += torch.sum(torch.tensor(preds)
