@@ -130,7 +130,7 @@ def train_net(net, dataloaders,
 
                         # backward pass + opt
                         if phase == 'train':
-                            if grad_acc_mode is True:
+                            if grad_acc_mode:
                                 loss = loss / accum_steps
                                 loss.backward()
                                 dl = len(dataloaders[phase])
@@ -146,7 +146,7 @@ def train_net(net, dataloaders,
                                 # scheduler.step()  # ----------------------------
 
                     # statistics
-                    if grad_acc_mode is True and phase == 'train':
+                    if grad_acc_mode and phase == 'train':
                         phase_loss += loss.detach().item() * accum_steps
                     else:
                         phase_loss += loss.detach().item()
@@ -168,7 +168,7 @@ def train_net(net, dataloaders,
             epoch_loss = phase_loss / (phase_bags)
             epoch_acc = phase_corrects.double() / (phase_bags)
 
-            if neptune_run is not None:
+            if neptune_run:
                 # NEPTUNE LOGGING
                 # print(phase + '/loss')
                 neptune_run[phase + '/loss'].log(epoch_loss)
