@@ -54,18 +54,13 @@ def train_net(net, dataloaders,
             phase_bags = 0
 
             for images, targets in dataloaders[phase]:
-                # bags = images.squeeze()  # commented
                 bags = images
                 bags_labels = targets["labels"].squeeze()
                 phase_bags += len(bags)
                 for images, labels in zip(bags, bags_labels):
-                    # images = images.unsqueeze(dim=0).to(device) # commented
                     images = images.to(device) # added 
                     labels = labels.reshape(-1).to(device)
-                    # print(images.shape)
-                    # print(labels.shape)
-                # optimizer.zero_grad()
-                # forward pass
+                    #forward pass
                     with torch.set_grad_enabled(phase == 'train'):
                         if net.__class__.__name__ in pe_ar_list:
                             outputs = net(images, targets["tile_cords"])
@@ -91,9 +86,6 @@ def train_net(net, dataloaders,
                                 loss = criterion(outputs[0].reshape(-1, 4), labels)
 
                         elif str(criterion) == 'BCELoss()':
-                            # preds = torch.sigmoid(outputs).reshape(-1).detach(
-                            #     ).cpu().numpy().round()
-
                             if type(net).__name__ == 'DSMIL':
                                 preds = torch.sigmoid(outputs[0]).reshape(
                                     -1).detach().cpu().numpy().round()
@@ -116,10 +108,7 @@ def train_net(net, dataloaders,
                                 loss = criterion(torch.sigmoid(
                                     outputs[0]).reshape(-1), labels) + \
                                     0.3 * outputs[4]['instance_loss']
-                                # print(preds, labels)
-                                # print(criterion(torch.sigmoid(
-                                #     outputs[0]).reshape(-1), labels),
-                                #       outputs[4]['instance_loss'])
+
                             else:
                                 preds = torch.sigmoid(outputs[0]).reshape(
                                     -1).detach().cpu().numpy().round()
@@ -219,8 +208,6 @@ def train_net(net, dataloaders,
     # clear memory usage that may stay after training
     torch.cuda.empty_cache()
     gc.collect()
-    # load best net weights
-    # net.load_state_dict(best_net_wts)
 
     return best_net_wts, best_net_wts_acc, loss_stats, accuracy_stats
 
