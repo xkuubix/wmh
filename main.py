@@ -73,6 +73,7 @@ grad_accu = config['training_plan']['parameters']['grad_accu']['is_on']
 grad_accu_steps = config['training_plan']['parameters']['grad_accu']['steps']
 net_ar = config['training_plan']['architectures']['names']
 net_size = config['training_plan']['architectures']['size']
+net_BN = config['training_plan']['architectures']['batchnorm']
 net_ar_dropout = config['training_plan']['architectures']['dropout']
 criterion_type = config['training_plan']['criterion']
 optimizer_type = config['training_plan']['optim_name']
@@ -189,15 +190,15 @@ net, criterion, optimizer, scheduler = choose_NCOS(
 
 
 # fine tune
-if 0:
+if 1:
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
-                     + '2d111a3b-0b6a-4735-be81-6dae96b39759',
+                     + 'b4fbdecd-4bd9-419b-bba4-fd07b71e42b7',
                      map_location=device)
     net.load_state_dict(std)
 
 # in theory batch size is 1 (in practice network sees batch size as concatenated slices)
-if 1:
+if not net_BN:
     def deactivate_batchnorm(net):
         if isinstance(net, nn.BatchNorm2d):
             net.track_running_stats = False
@@ -213,7 +214,7 @@ if config['run_with_neptune']:
 else:
     neptune_run = None
 
-if 0:
+if 1:
     state_dict_BL, state_dict_BACC, loss_stats, accuracy_stats = train_net(
         net, data_loaders,
         data_loaders_sizes,
@@ -237,7 +238,7 @@ if 0:
     torch.save(state_dict_BL, model_save_path)
 #%%
 # TEST NETWORK----------------------------------------------------------------
-if 0:
+if 1:
     # test best val accuracy model
     net_BACC = net
     net_BACC.load_state_dict(state_dict_BACC)
@@ -279,7 +280,7 @@ if 0:
 if neptune_run:
     neptune_run.stop()
 # %%
-if 1:
+if 0:
 
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
@@ -287,8 +288,12 @@ if 1:
                     #  + 'debe6bb9-8f7c-4937-a05c-4c82525b5157',
                     #  + 'ee71998c-e395-4c43-8754-092893ba0f58',
                     #  + '54861e2e-e6a0-4c89-a3b1-1bf293f0bb47',
-                     + '8ee1293f-428e-46fa-b3fd-68be52754c0a',
-                    #  + '34f54771-8112-4403-8226-0a4c3f5b4b76',
+                    #  + 'ea2b06c8-c261-48be-8099-eead680206f7', # small bez selectów słabo
+                     + 'b4fbdecd-4bd9-419b-bba4-fd07b71e42b7', # batchowo uczony. nawet git (dużo FP)
+                    #  + '7eba5f47-2be0-48b6-ae47-a475854a4c12', # batchowo uczony słabo
+                    #  + '194efa70-7dcc-4225-b1e2-d9b0a93dcfd6', # tiny coś tam coś tam
+                    #  + 'ce91861d-3360-401c-9151-f1a89b4033a2', # słabo small
+                    #  + '8ee1293f-428e-46fa-b3fd-68be52754c0a', ###
                      map_location=device)
     net.load_state_dict(std)
     with torch.no_grad():
@@ -343,10 +348,12 @@ if 1:
                 # ig = IntegratedGradients(net)  # Initialize IntegratedGradients with your model
                 # baseline = torch.zeros_like(mil_slice)  # Define a baseline (usually a tensor of zeros)
                 # attributions, _ = ig.attribute(mil_slice, baselines=baseline, return_convergence_delta=True)
-                layer_gc = LayerGradCam(net, net.feature_extractor.layer4[-1].conv2)  # Initialize GradCAM with model and target layer 
+                # layer_gc = LayerGradCam(net, net.feature_extractor.layer4[-1].conv2)  # medium 
+                layer_gc = LayerGradCam(net, net.feature_extractor[-3][1].conv2)  # tiny/small
                 # target = 
                 attributions = layer_gc.attribute(mil_slice, target=0)  # Compute attributions for (0th) first neuron (and only is present)
-                attributions = LayerAttribution.interpolate(attributions, (33, 33))
+                attributions = LayerAttribution.interpolate(attributions, (32, 32))
+                # attributions = LayerAttribution.interpolate(attributions, (33, 33))
                 attributions = attributions.squeeze().cpu() # 
 
                 # for iter in range(len(tiles)):
