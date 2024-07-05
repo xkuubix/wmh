@@ -14,15 +14,16 @@ data_sets:
 
   # stride = int(patch_size * (1-overlap)) |>| 0.96875 for patch size 32, it produces 1 px stride in overlap
   patch_size: 32 # 33 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  overlap_train_val: 0.96875 # 0.9375
-  overlap_test: 0.96875     # 0.875
+  overlap_train_val: 0.875 # 0.9375
+  overlap_test: 0.875     # 0.9675
 
 training_plan:
   architectures:
     # amil, gamil, l_dsmil, nl_dsmil, gmamil, clam_sb, clam_mb
     names: 'gamil'
-    size: 'small'
+    size: 'small'     # tiny/small/medium/big
     dropout: True #p=0.25
+    batchnorm: True
   parameters:
     batch_size: 1
     epochs: [50]
