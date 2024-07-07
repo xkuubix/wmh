@@ -14,8 +14,8 @@ data_sets:
 
   # stride = int(patch_size * (1-overlap)) |>| 0.96875 for patch size 32, it produces 1 px stride in overlap
   patch_size: 32 # 33 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  overlap_train_val: 0.875 # 0.9375
-  overlap_test: 0.875     # 0.9675
+  overlap_train_val: 0.93 # 0.9375
+  overlap_test: 0.93     # 0.9675
 
 training_plan:
   architectures:
