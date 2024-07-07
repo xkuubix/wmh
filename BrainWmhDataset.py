@@ -44,29 +44,7 @@ class BrainWmhDataset(torch.utils.data.Dataset):
                         # -n don't generate the default brain image output
                         os.system(bet_cmd)
                         print(f'Brain mask generated: {output_path}')
-                        # brain = np.array(nib.load(f).get_fdata())
-                        # brain = torch.from_numpy(brain)
-                        # brain = brain.permute(2, 0, 1)
-
-                        # kernel_size = 32
-                        # structuring_element = torch.ones(1, 1, kernel_size, kernel_size, dtype=torch.double)
-                        # # Apply morphological erosion
-                        # erosion = torch.nn.functional.conv2d(brain.unsqueeze(0).permute(1, 0, 2, 3), structuring_element, padding=kernel_size // 2)
-
-                        # # Apply morphological dilation            
-                        # dilation = torch.nn.functional.conv2d(erosion, structuring_element, padding=kernel_size // 2)
-                        # dilation=dilation/dilation.max()
-                        # dilation[dilation<0.2*dilation.max()]=0
-                        # dilation[dilation>=0.2*dilation.max()]=1
-                        # brain_mask = dilation.squeeze(1)
-                        # brain_mask = brain_mask[:, :brain.shape[1], : brain.shape[2]]
-                        # nifti_file = nib.Nifti1Image(brain_mask.numpy(), np.eye(4))
-                        # # path_to_save = root + '/brain_mask.nii'
-                        # pth = os.path.join(root, 'brain_mask.nii')
-                        # nib.save(nifti_file, pth) 
-                        # self.brain['brain_mask'].append(pth)
                     else:
-                        # pth = os.path.join(root, 'brain_mask.nii')
                         pth = os.path.join(root, 'brain_mask_bet_mask.nii.gz')
                         self.brain['brain_mask'].append(pth)
 
