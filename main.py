@@ -63,6 +63,7 @@ mil_params_test = {'patch_size': patch_size,
 #paths
 train_dir = config['dir']['train']
 test_dir = config['dir']['test']
+root_dir = config['dir']['root']
 
 # training parameters
 EPOCHS = config['training_plan']['parameters']['epochs'][0]
@@ -182,7 +183,7 @@ net, criterion, optimizer, scheduler = choose_NCOS(
     net_size=net_size,
     dropout=net_ar_dropout,
     device=device,
-    pretrained=True,
+    pretrained=root_dir+'/neptune_saved_models/d2f6e0c1-92b7-47a2-b656-3404c4601e2f',
     criterion_type=criterion_type,
     optimizer_type=optimizer_type,
     lr=lr, wd=wd,
@@ -190,7 +191,7 @@ net, criterion, optimizer, scheduler = choose_NCOS(
 
 
 # fine tune
-if 1:
+if 0:
     std = torch.load(config['dir']['root']
                      + 'neptune_saved_models/'
                      + 'b4fbdecd-4bd9-419b-bba4-fd07b71e42b7',
@@ -289,9 +290,10 @@ if 0:
                     #  + 'ee71998c-e395-4c43-8754-092893ba0f58',
                     #  + '54861e2e-e6a0-4c89-a3b1-1bf293f0bb47',
                     #  + 'ea2b06c8-c261-48be-8099-eead680206f7', # small bez selectów słabo
-                     + 'b4fbdecd-4bd9-419b-bba4-fd07b71e42b7', # batchowo uczony. nawet git (dużo FP)
+                    #  + 'b4fbdecd-4bd9-419b-bba4-fd07b71e42b7', # batchowo uczony. nawet git (dużo FP)
                     #  + '7eba5f47-2be0-48b6-ae47-a475854a4c12', # batchowo uczony słabo
                     #  + '194efa70-7dcc-4225-b1e2-d9b0a93dcfd6', # tiny coś tam coś tam
+                     + '1edf4511-0a5b-4c6d-a64e-526a907dfcae', # tiny adam
                     #  + 'ce91861d-3360-401c-9151-f1a89b4033a2', # słabo small
                     #  + '8ee1293f-428e-46fa-b3fd-68be52754c0a', ###
                      map_location=device)

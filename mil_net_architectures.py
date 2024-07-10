@@ -104,11 +104,24 @@ class AttentionMIL(nn.Module):
         # size big
         if size_arg == 'medium': # 11.2M params // feature extractor
             if pretrained:
-                self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+                if isinstance(pretrained, str):
+                    self.feature_extractor = models.resnet18()
+                    state_dict = torch.load(pretrained)
+                    try:
+                        state_dict.pop('fc.weight', None)
+                        state_dict.pop('fc.bias', None)
+                        self.feature_extractor.load_state_dict(state_dict, strict=False)
+                    except:
+                        raise ValueError(f'argument must be path to state dict or bool for default weights: {pretrained}')
+                    self.feature_extractor.fc = Identity()
+                    print(f"Pretrained feature_extractor loaded: {pretrained.split('/')[-1]}")
+                elif isinstance(pretrained, bool):
+                    self.feature_extractor = models.resnet18(weights=ResNet18_Weights.DEFAULT)
+                    print(f"Pretrained feature_extractor loaded: weights=ResNet18_Weights.DEFAULT")
+                    self.feature_extractor.fc = Identity()
             else:
                 self.feature_extractor = models.resnet18()
-            # self.num_features = self.feature_extractor.fc.in_features
-            self.feature_extractor.fc = Identity()
+                self.feature_extractor.fc = Identity()
         # size small
         elif size_arg == 'small': # 2.2M params // feature extractor
         # use 6 blocks (output -1, 256, 3, 3 before adaptive avg pool for 33x33 input)
